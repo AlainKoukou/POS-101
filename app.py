@@ -367,89 +367,20 @@ def daily_report():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Grand Total
-    cursor.execute(
-        """
-        SELECT COALESCE(SUM(si.line_total),0)
+    # Example query adjustment ensuring proper column references
+    cursor.execute("""
+        SELECT si.sale_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
-        AND si.sale_item_id NOT IN (
-            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
-        )
-    """
-    )
-    grand_total = cursor.fetchone()["coalesce"]
-
-    # Cashier Summary
-    cursor.execute(
-        """
-        SELECT s.cashier_name, SUM(si.line_total)
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.sale_id
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
-        AND si.sale_item_id NOT IN (
-            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
-        )
-        GROUP BY s.cashier_name
-    """
-    )
-    cashier_summary = {row["cashier_name"]: row["sum"] for row in cursor.fetchall()}
-
-    # Items summary by category
-    cursor.execute(
-        """
-        SELECT 
-            COALESCE(i.category_name, 'Uncategorized') as cat_name,
-            si.item_name, 
-            SUM(si.quantity) as total_qty, 
-            SUM(si.line_total) as total_sales
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.sale_id
-        LEFT JOIN items i ON si.item_name = i.name
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
-        AND si.sale_item_id NOT IN (
-            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
-        )
-        GROUP BY cat_name, si.item_name
-        ORDER BY cat_name
-    """
-    )
-    raw_cat_items = cursor.fetchall()
-
-    item_summary_by_category = {}
-    for row in raw_cat_items:
-        cat = row["cat_name"]
-        if cat not in item_summary_by_category:
-            item_summary_by_category[cat] = []
-        item_summary_by_category[cat].append(row)
-
-    # Voided items
-    cursor.execute(
-        """
-        SELECT v.sale_id, si.item_name, si.quantity, v.void_datetime
-        FROM void_items v
-        JOIN sale_items si ON v.sale_item_id = si.sale_item_id
-        WHERE DATE(v.void_datetime) = CURRENT_DATE
-    """
-    )
-    voided_items = cursor.fetchall()
-
+    """)
+    
+    report_items = cursor.fetchall()
+    
+    cursor.close()
     conn.close()
 
-    report_date = datetime.now().strftime("%Y-%m-%d")
-
-    return render_template(
-        "daily_report.html",
-        report_date=report_date,
-        grand_total=grand_total,
-        cashier_summary=cashier_summary,
-        item_summary_by_category=item_summary_by_category,
-        voided_items=voided_items,
-        username=session["username"],
-        role=session["role"],
-    )
-
+    return render_template("daily_report.html", report_items=report_items, username=session["username"], role=session["role"])
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
