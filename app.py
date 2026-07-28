@@ -331,19 +331,19 @@ def checkout():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Insert sale and retrieve the generated sale_id using RETURNING
     cursor.execute(
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
         VALUES (%s, %s, NOW())
+        RETURNING sale_id
     """,
         (cashier, total),
     )
     
-    # Retrieve last inserted ID dynamically based on DB driver if needed, 
-    # but using RETURNING id or standard cursors:
-    cursor.execute("SELECT currval(pg_get_serial_sequence('sales','sale_id'))")
     sale_id_row = cursor.fetchone()
-    sale_id = sale_id_row[0] if sale_id_row else None
+    # Access the dictionary key returned by RETURNING
+    sale_id = sale_id_row["sale_id"] if sale_id_row else None
 
     for item in cart:
         cursor.execute(
@@ -358,7 +358,6 @@ def checkout():
     conn.close()
 
     return jsonify({"message": "Checkout successful!"})
-
 
 @app.route("/daily_report")
 def daily_report():
