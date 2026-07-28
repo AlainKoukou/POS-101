@@ -157,20 +157,29 @@ def add_item():
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
             image_filename = filename
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO items (name, category_name, price, image)
-        VALUES (%s, %s, %s, %s)
-    """,
-        (name, category_name, price, image_filename),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert or update if item already exists (Upsert)
+        cursor.execute(
+            """
+            INSERT INTO items (name, category_name, price, image)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (name) DO UPDATE 
+            SET category_name = EXCLUDED.category_name, 
+                price = EXCLUDED.price, 
+                image = COALESCE(EXCLUDED.image, items.image)
+            """,
+            (name, category_name, price, image_filename),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error adding/updating item: {e}")
+        return f"Error: Could not save item. {e}"
 
     return redirect("/admin")
-
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
@@ -356,6 +365,8 @@ def void_page():
         username=session["username"],
         role=session["role"],
     )
+
+
 @app.route("/add_category", methods=["POST"])
 def add_category():
     if "role" not in session or session["role"] != "admin":
