@@ -161,7 +161,6 @@ def add_item():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Insert or update if item already exists (Upsert)
         cursor.execute(
             """
             INSERT INTO items (name, category_name, price, image)
@@ -180,6 +179,7 @@ def add_item():
         return f"Error: Could not save item. {e}"
 
     return redirect("/admin")
+
 
 @app.route("/update_price", methods=["POST"])
 def update_price():
@@ -214,6 +214,7 @@ def update_price():
 
     return redirect("/admin")
 
+
 @app.route("/delete_item", methods=["POST"])
 def delete_item():
     if "role" not in session or session["role"] != "admin":
@@ -238,6 +239,7 @@ def delete_item():
         print(f"Error deleting item: {e}")
 
     return redirect("/admin")
+
 
 @app.route("/delete_category", methods=["POST"])
 def delete_category():
@@ -264,6 +266,7 @@ def delete_category():
 
     return redirect("/admin")
 
+
 @app.route("/delete_user", methods=["POST"])
 def delete_user():
     if "role" not in session or session["role"] != "admin":
@@ -288,6 +291,7 @@ def delete_user():
         print(f"Error deleting user: {e}")
 
     return redirect("/admin")
+
 
 @app.route("/update_user_password", methods=["POST"])
 def update_user_password():
@@ -315,6 +319,7 @@ def update_user_password():
 
     return redirect("/admin")
 
+
 @app.route("/checkout", methods=["POST"])
 def checkout():
     if "username" not in session:
@@ -331,7 +336,6 @@ def checkout():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Insert sale and retrieve the generated sale_id using RETURNING
     cursor.execute(
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
@@ -342,7 +346,6 @@ def checkout():
     )
     
     sale_id_row = cursor.fetchone()
-    # Access the dictionary key returned by RETURNING
     sale_id = sale_id_row["sale_id"] if sale_id_row else None
 
     for item in cart:
@@ -374,16 +377,28 @@ def daily_report():
         JOIN sales s ON si.sale_id = s.sale_id
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
     """)
-    
     report_items = cursor.fetchall()
     
     grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
 
-    # Build a summary dictionary to satisfy item_summary_by_category in the template
+    # Aggregate by category name and item name to fully satisfy daily_report.html attribute requirements (total_sales)
+    cursor.execute("""
+        SELECT 
+            COALESCE(i.category_name, 'Uncategorized') as category_name,
+            si.item_name, 
+            SUM(si.line_total) as total_sales, 
+            SUM(si.quantity) as total_quantity
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        GROUP BY COALESCE(i.category_name, 'Uncategorized'), si.item_name
+    """)
+    aggregated_items = cursor.fetchall()
+
     item_summary_by_category = {}
-    for item in report_items:
-        # Grouping by item name (or change to category if your query includes it)
-        category = item["item_name"] 
+    for item in aggregated_items:
+        category = item["category_name"]
         if category not in item_summary_by_category:
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
@@ -399,6 +414,7 @@ def daily_report():
         username=session["username"], 
         role=session["role"]
     )
+
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
@@ -425,7 +441,6 @@ def void_page():
         conn.close()
         return redirect("/void_page")
 
-    # Fetch recent sale items that are not already voided
     cursor.execute(
         """
         SELECT si.sale_item_id, s.sale_id, s.cashier_name, si.item_name, si.quantity, si.line_total, s.sale_datetime
@@ -474,6 +489,7 @@ def add_category():
 
     return redirect("/admin")
 
+
 @app.route("/download_report")
 def download_report():
     if "role" not in session or session["role"] != "admin":
@@ -487,8 +503,8 @@ def download_report():
         SELECT 
             COALESCE(i.category_name, 'Uncategorized') as cat_name,
             si.item_name, 
-            SUM(si.quantity), 
-            SUM(si.line_total)
+            SUM(si.quantity) as total_qty, 
+            SUM(si.line_total) as total_line
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
@@ -504,14 +520,14 @@ def download_report():
 
     pdf_categories = {}
     for row in raw_items:
-        cat = row[0]
+        cat = row["cat_name"]
         if cat not in pdf_categories:
             pdf_categories[cat] = []
-        pdf_categories[cat].append((row[1], row[2], row[3]))
+        pdf_categories[cat].append((row["item_name"], row["total_qty"], row["total_line"]))
 
     cursor.execute(
         """
-        SELECT COALESCE(SUM(si.line_total),0)
+        SELECT COALESCE(SUM(si.line_total),0) as total_sum
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
@@ -521,7 +537,7 @@ def download_report():
     """
     )
     total_row = cursor.fetchone()
-    total = total_row["coalesce"] if total_row else 0
+    total = total_row["total_sum"] if total_row else 0
     conn.close()
 
     from reportlab.pdfgen import canvas
