@@ -88,8 +88,40 @@ def admin():
     )
     items = cursor.fetchall()
 
+    # Fetch users for the users management table on admin page
+    cursor.execute("SELECT username, role FROM users")
+    users = cursor.fetchall()
+
     conn.close()
-    return render_template("admin.html", categories=categories, items=items)
+    return render_template("admin.html", categories=categories, items=items, users=users)
+
+
+@app.route("/add_user", methods=["POST"])
+def add_user():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    username = request.form.get("username")
+    password = request.form.get("password")
+    role = request.form.get("role", "cashier")
+
+    if not username or not password:
+        return redirect("/admin")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
+            (username, password, role)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error adding user: {e}")
+
+    return redirect("/admin")
 
 
 @app.route("/add_item", methods=["POST"])
@@ -130,7 +162,7 @@ def add_item():
     cursor.execute(
         """
         INSERT INTO items (name, category_name, price, image)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """,
         (name, category_name, price, image_filename),
     )
@@ -159,17 +191,22 @@ def checkout():
     cursor.execute(
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
-        VALUES (?, ?, datetime('now'))
+        VALUES (%s, %s, NOW())
     """,
         (cashier, total),
     )
-    sale_id = cursor.lastrowid
+    
+    # Retrieve last inserted ID dynamically based on DB driver if needed, 
+    # but using RETURNING id or standard cursors:
+    cursor.execute("SELECT currval(pg_get_serial_sequence('sales','sale_id'))")
+    sale_id_row = cursor.fetchone()
+    sale_id = sale_id_row[0] if sale_id_row else None
 
     for item in cart:
         cursor.execute(
             """
             INSERT INTO sale_items (sale_id, item_name, quantity, line_total)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         """,
             (sale_id, item["name"], item["quantity"], item["line_total"]),
         )
@@ -194,13 +231,13 @@ def daily_report():
         SELECT COALESCE(SUM(si.line_total),0)
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
-        WHERE date(s.sale_datetime) = date('now')
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
     """
     )
-    grand_total = cursor.fetchone()[0]
+    grand_total = cursor.fetchone()["coalesce"]
 
     # Cashier Summary
     cursor.execute(
@@ -208,14 +245,14 @@ def daily_report():
         SELECT s.cashier_name, SUM(si.line_total)
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
-        WHERE date(s.sale_datetime) = date('now')
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
         GROUP BY s.cashier_name
     """
     )
-    cashier_summary = dict(cursor.fetchall())
+    cashier_summary = {row["cashier_name"]: row["sum"] for row in cursor.fetchall()}
 
     # Items summary by category
     cursor.execute(
@@ -228,7 +265,7 @@ def daily_report():
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
-        WHERE date(s.sale_datetime) = date('now')
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
@@ -251,7 +288,7 @@ def daily_report():
         SELECT v.sale_id, si.item_name, si.quantity, v.void_datetime
         FROM void_items v
         JOIN sale_items si ON v.sale_item_id = si.sale_item_id
-        WHERE date(v.void_datetime) = date('now')
+        WHERE DATE(v.void_datetime) = CURRENT_DATE
     """
     )
     voided_items = cursor.fetchall()
@@ -270,6 +307,8 @@ def daily_report():
         username=session["username"],
         role=session["role"],
     )
+
+
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
     if "role" not in session or session["role"] != "admin":
@@ -286,7 +325,7 @@ def void_page():
             cursor.execute(
                 """
                 INSERT INTO void_items (sale_item_id, void_datetime, reason)
-                VALUES (?, datetime('now'), ?)
+                VALUES (%s, NOW(), %s)
             """,
                 (sale_item_id, reason),
             )
@@ -318,6 +357,7 @@ def void_page():
         role=session["role"],
     )
 
+
 @app.route("/download_report")
 def download_report():
     if "role" not in session or session["role"] != "admin":
@@ -336,7 +376,7 @@ def download_report():
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
-        WHERE date(s.sale_datetime) = date('now')
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
@@ -358,13 +398,14 @@ def download_report():
         SELECT COALESCE(SUM(si.line_total),0)
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
-        WHERE date(s.sale_datetime)=date('now')
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
     """
     )
-    total = cursor.fetchone()[0]
+    total_row = cursor.fetchone()
+    total = total_row["coalesce"] if total_row else 0
     conn.close()
 
     from reportlab.pdfgen import canvas
