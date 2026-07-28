@@ -181,6 +181,140 @@ def add_item():
 
     return redirect("/admin")
 
+@app.route("/update_price", methods=["POST"])
+def update_price():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    item_name = request.form.get("name")
+    new_price_str = request.form.get("new_price")
+
+    if not item_name or not new_price_str:
+        return redirect("/admin")
+
+    try:
+        new_price = float(new_price_str)
+        if new_price < 0:
+            return "Error: Price cannot be negative."
+    except ValueError:
+        return "Error: Invalid price format."
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE items SET price = %s WHERE name = %s",
+            (new_price, item_name)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error updating price: {e}")
+
+    return redirect("/admin")
+
+@app.route("/delete_item", methods=["POST"])
+def delete_item():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    item_name = request.form.get("name")
+
+    if not item_name:
+        return redirect("/admin")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM items WHERE name = %s",
+            (item_name,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error deleting item: {e}")
+
+    return redirect("/admin")
+
+@app.route("/delete_category", methods=["POST"])
+def delete_category():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    category_name = request.form.get("name")
+
+    if not category_name:
+        return redirect("/admin")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM categories WHERE name = %s",
+            (category_name,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error deleting category: {e}")
+
+    return redirect("/admin")
+
+@app.route("/delete_user", methods=["POST"])
+def delete_user():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    username = request.form.get("username")
+
+    if not username:
+        return redirect("/admin")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM users WHERE username = %s",
+            (username,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+
+    return redirect("/admin")
+
+@app.route("/update_user_password", methods=["POST"])
+def update_user_password():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    username = request.form.get("username")
+    new_password = request.form.get("new_password")
+
+    if not username or not new_password:
+        return redirect("/admin")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET password = %s WHERE username = %s",
+            (new_password, username)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error updating password: {e}")
+
+    return redirect("/admin")
+
 @app.route("/checkout", methods=["POST"])
 def checkout():
     if "username" not in session:
