@@ -32,14 +32,14 @@
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
                     {% for item in items %}
                     <button class="btn" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item.name|tojson }}, {{ item.price }})'>
-                        {% if item[2] %}
-                            <img src="{{ url_for('static', filename='uploads/' + item[2]) }}" alt="{{ item[0] }}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
+                        {% if item.image %}
+                            <img src="{{ url_for('static', filename='uploads/' + item.image) }}" alt="{{ item.name }}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
                         {% else %}
                             <div style="width: 60px; height: 60px; background: #e5e7eb; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; margin-bottom: 8px;">No Image</div>
                         {% endif %}
-                        <strong>{{ item[0] }}</strong>
-                        <span>${{ "%.2f"|format(item[1]) }}</span>
-                        <small style="font-size: 0.8em; opacity: 0.8;">{{ "%.0f"|format(item[1] * 90000) }} LBP</small>
+                        <strong>{{ item.name }}</strong>
+                        <span>${{ "%.2f"|format(item.price) }}</span>
+                        <small style="font-size: 0.8em; opacity: 0.8;">{{ "%.0f"|format(item.price * 90000) }} LBP</small>
                     </button>
                     {% endfor %}
                 </div>
