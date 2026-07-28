@@ -197,3 +197,16 @@ a:hover {
 .danger-btn:hover {
     background: #b91c1c;
 }
+
+.items-grid, .items-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); /* Adjusts how many fit per row and increases minimum card width */
+    gap: 16px;
+}
+
+.item-card, .item-btn {
+    min-width: 160px;
+    min-height: 180px; /* Increases the height of the box */
+    padding: 20px;     /* Gives more breathing room inside the box */
+    font-size: 16px;   /* Makes text easier to read */
+}
