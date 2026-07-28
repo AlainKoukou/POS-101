@@ -38,12 +38,12 @@
 
                 {% for user in users %}
                 <tr>
-                    <td>{{ user[0] }}</td>
-                    <td>{{ user[1] }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.role }}</td>
 
                     <td>
                         <form action="/delete_user" method="POST">
-                            <input type="hidden" name="username" value="{{ user[0] }}">
+                            <input type="hidden" name="username" value="{{ user.username }}">
                             <button type="submit" class="btn">Delete</button>
                         </form>
                     </td>
@@ -51,7 +51,7 @@
                     <td>
                         <form action="/update_user_password" method="POST"
                             style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                            <input type="hidden" name="username" value="{{ user[0] }}">
+                            <input type="hidden" name="username" value="{{ user.username }}">
                             <input type="text" name="new_password" required>
                             <button type="submit" class="btn">Update</button>
                         </form>
@@ -96,10 +96,10 @@
                 </tr>
                 {% for category in categories %}
                 <tr>
-                    <td>{{ category[0] }}</td>
+                    <td>{{ category.name }}</td>
                     <td>
                         <form action="/delete_category" method="POST">
-                            <input type="hidden" name="name" value="{{ category[0] }}">
+                            <input type="hidden" name="name" value="{{ category.name }}">
                             <button type="submit" class="btn">Delete</button>
                         </form>
                     </td>
@@ -133,7 +133,7 @@
                     <label>Category</label>
                     <select name="category_name" required>
                         {% for category in categories %}
-                        <option value="{{ category[0] }}">{{ category[0] }}</option>
+                        <option value="{{ category.name }}">{{ category.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -169,16 +169,16 @@
 
                 {% for item in items %}
                 <tr>
-                    <td>{{ item[0] }}</td>
-                    <td>{{ item[1] }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.category_name }}</td>
                     <td>
-                        ${{ "%.2f"|format(item[2]) }} 
-                        <br><small style="color: gray;">({{ "%.0f"|format(item[2] * 90000) }} LBP)</small>
+                        ${{ "%.2f"|format(item.price) }} 
+                        <br><small style="color: gray;">({{ "%.0f"|format(item.price * 90000) }} LBP)</small>
                     </td>
 
                     <td>
                         <form action="/delete_item" method="POST">
-                            <input type="hidden" name="name" value="{{ item[0] }}">
+                            <input type="hidden" name="name" value="{{ item.name }}">
                             <button type="submit" class="btn">Delete</button>
                         </form>
                     </td>
@@ -186,7 +186,7 @@
                     <td>
                         <form action="/update_price" method="POST"
                             style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                            <input type="hidden" name="name" value="{{ item[0] }}">
+                            <input type="hidden" name="name" value="{{ item.name }}">
                             <input type="number" step="0.01" name="new_price" placeholder="USD" required>
                             <button type="submit" class="btn">Update</button>
                         </form>
