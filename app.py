@@ -88,7 +88,6 @@ def admin():
     )
     items = cursor.fetchall()
 
-    # Fetch users for the users management table on admin page
     cursor.execute("SELECT username, role FROM users")
     users = cursor.fetchall()
 
@@ -381,7 +380,6 @@ def daily_report():
     
     grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
 
-    # Aggregate by category name and item name to fully satisfy daily_report.html attribute requirements (total_sales)
     cursor.execute("""
         SELECT 
             COALESCE(i.category_name, 'Uncategorized') as category_name,
@@ -462,6 +460,49 @@ def void_page():
         username=session["username"],
         role=session["role"],
     )
+
+
+@app.route("/reset_today", methods=["POST"])
+def reset_today():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Clear void references and sale items for today's sales first to maintain constraints, then delete sales
+        cursor.execute("""
+            DELETE FROM void_items 
+            WHERE sale_item_id IN (
+                SELECT si.sale_item_id 
+                FROM sale_items si 
+                JOIN sales s ON si.sale_id = s.sale_id 
+                WHERE DATE(s.sale_datetime) = CURRENT_DATE
+            )
+        """)
+        
+        cursor.execute("""
+            DELETE FROM sale_items 
+            WHERE sale_id IN (
+                SELECT sale_id 
+                FROM sales 
+                WHERE DATE(sale_datetime) = CURRENT_DATE
+            )
+        """)
+        
+        cursor.execute("""
+            DELETE FROM sales 
+            WHERE DATE(sale_datetime) = CURRENT_DATE
+        """)
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error resetting today's sales: {e}")
+
+    return redirect("/daily_report")
 
 
 @app.route("/add_category", methods=["POST"])
