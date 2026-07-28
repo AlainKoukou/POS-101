@@ -358,6 +358,8 @@ def checkout():
     conn.close()
 
     return jsonify({"message": "Checkout successful!"})
+
+
 @app.route("/daily_report")
 def daily_report():
     if "role" not in session or session["role"] != "admin":
@@ -375,8 +377,16 @@ def daily_report():
     
     report_items = cursor.fetchall()
     
-    # Calculate the grand total from the line totals
     grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
+
+    # Build a summary dictionary to satisfy item_summary_by_category in the template
+    item_summary_by_category = {}
+    for item in report_items:
+        # Grouping by item name (or change to category if your query includes it)
+        category = item["item_name"] 
+        if category not in item_summary_by_category:
+            item_summary_by_category[category] = []
+        item_summary_by_category[category].append(item)
 
     cursor.close()
     conn.close()
@@ -385,6 +395,7 @@ def daily_report():
         "daily_report.html", 
         report_items=report_items, 
         grand_total=grand_total, 
+        item_summary_by_category=item_summary_by_category,
         username=session["username"], 
         role=session["role"]
     )
