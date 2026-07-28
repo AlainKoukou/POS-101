@@ -356,7 +356,30 @@ def void_page():
         username=session["username"],
         role=session["role"],
     )
+@app.route("/add_category", methods=["POST"])
+def add_category():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
 
+    category_name = request.form.get("name")
+
+    if not category_name:
+        return redirect("/admin")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO categories (name) VALUES (%s)",
+            (category_name,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error adding category: {e}")
+
+    return redirect("/admin")
 
 @app.route("/download_report")
 def download_report():
