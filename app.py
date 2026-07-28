@@ -66,12 +66,6 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
-
-
 @app.route("/admin")
 def admin():
     if "role" not in session or session["role"] != "admin":
@@ -92,8 +86,16 @@ def admin():
     users = cursor.fetchall()
 
     conn.close()
-    return render_template("admin.html", categories=categories, items=items, users=users)
-
+    
+    # Added username and role to fix the empty display header
+    return render_template(
+        "admin.html", 
+        categories=categories, 
+        items=items, 
+        users=users, 
+        username=session.get("username"), 
+        role=session.get("role")
+    )
 
 @app.route("/add_user", methods=["POST"])
 def add_user():
