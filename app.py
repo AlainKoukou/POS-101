@@ -97,6 +97,11 @@ def admin():
         role=session.get("role")
     )
 
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
 @app.route("/add_user", methods=["POST"])
 def add_user():
     if "role" not in session or session["role"] != "admin":
