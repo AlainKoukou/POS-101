@@ -31,7 +31,7 @@
                 <h2>Items</h2>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
                     {% for item in items %}
-                    <button class="btn" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item[0]|tojson }}, {{ item[1] }})'>
+                    <button class="btn" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item.name|tojson }}, {{ item.price }})'>
                         {% if item[2] %}
                             <img src="{{ url_for('static', filename='uploads/' + item[2]) }}" alt="{{ item[0] }}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
                         {% else %}
