@@ -50,7 +50,7 @@ def login():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT * FROM users WHERE username = ? AND password = ?",
+            "SELECT * FROM users WHERE username = %s AND password = %s",
             (username, password),
         )
         user = cursor.fetchone()
