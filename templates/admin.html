@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Admin Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="topbar">
+        Logged in as: <strong>{{ username }}</strong> ({{ role }})
+        <span style="float:right;">
+            <a href="/logout">Logout</a>
+            <a href="/">POS</a>
+            <a href="/daily_report">Daily Report</a>
+            <a href="/void_page">Void Page</a>
+        </span>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+            <h1>Admin Dashboard</h1>
+            <p>Manage users, categories, and items.</p>
+        </div>
+
+        <div class="card">
+            <h2>Users Management</h2>
+
+            <table>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Delete</th>
+                    <th>Change Password</th>
+                </tr>
+
+                {% for user in users %}
+                <tr>
+                    <td>{{ user[0] }}</td>
+                    <td>{{ user[1] }}</td>
+
+                    <td>
+                        <form action="/delete_user" method="POST">
+                            <input type="hidden" name="username" value="{{ user[0] }}">
+                            <button type="submit" class="btn">Delete</button>
+                        </form>
+                    </td>
+
+                    <td>
+                        <form action="/update_user_password" method="POST"
+                            style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="hidden" name="username" value="{{ user[0] }}">
+                            <input type="text" name="new_password" required>
+                            <button type="submit" class="btn">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <br>
+
+            <h3>Add New User</h3>
+            <form action="/add_user" method="POST" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Username</label>
+                    <input type="text" name="username" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Password</label>
+                    <input type="text" name="password" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Role</label>
+                    <select name="role">
+                        <option value="cashier">Cashier</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn">Add User</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Categories</h2>
+
+            <table>
+                <tr>
+                    <th>Category Name</th>
+                    <th>Delete</th>
+                </tr>
+                {% for category in categories %}
+                <tr>
+                    <td>{{ category[0] }}</td>
+                    <td>
+                        <form action="/delete_category" method="POST">
+                            <input type="hidden" name="name" value="{{ category[0] }}">
+                            <button type="submit" class="btn">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <br>
+
+            <h3>Add Category</h3>
+            <form action="/add_category" method="POST" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category Name</label>
+                    <input type="text" name="name" required>
+                </div>
+
+                <button type="submit" class="btn">Add Category</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Add New Item</h2>
+
+            <form action="/add_item" method="POST" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Item Name</label>
+                    <input type="text" name="name" placeholder="Item Name" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category</label>
+                    <select name="category_name" required>
+                        {% for category in categories %}
+                        <option value="{{ category[0] }}">{{ category[0] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Price ($ USD)</label>
+                    <input type="number" step="0.01" name="price" placeholder="e.g. 10.00">
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Or Price (LBP)</label>
+                    <input type="number" step="1000" name="price_lbp" placeholder="e.g. 900000">
+                    <small style="display: block; color: gray; font-size: 0.8em;">Rate: 90,000 LBP = $1</small>
+                    <label style="font-size: 0.9em; color: #555;">Item Image:</label>
+                    <input type="file" name="image" accept="image/*">
+                </div>
+
+                <button type="submit" class="btn">Add Item</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Items List</h2>
+
+            <table>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Delete</th>
+                    <th>Update Price</th>
+                </tr>
+
+                {% for item in items %}
+                <tr>
+                    <td>{{ item[0] }}</td>
+                    <td>{{ item[1] }}</td>
+                    <td>
+                        ${{ "%.2f"|format(item[2]) }} 
+                        <br><small style="color: gray;">({{ "%.0f"|format(item[2] * 90000) }} LBP)</small>
+                    </td>
+
+                    <td>
+                        <form action="/delete_item" method="POST">
+                            <input type="hidden" name="name" value="{{ item[0] }}">
+                            <button type="submit" class="btn">Delete</button>
+                        </form>
+                    </td>
+                    
+                    <td>
+                        <form action="/update_price" method="POST"
+                            style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="hidden" name="name" value="{{ item[0] }}">
+                            <input type="number" step="0.01" name="new_price" placeholder="USD" required>
+                            <button type="submit" class="btn">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

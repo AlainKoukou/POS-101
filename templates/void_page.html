@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Void Items - POS System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div class="topbar">
+        Logged in as: <strong>{{ username }}</strong> ({{ role }})
+        <span style="float:right;">
+            <a href="/">POS</a>
+            <a href="/admin">Admin</a>
+            <a href="/daily_report">Daily Report</a>
+            <a href="/logout">Logout</a>
+        </span>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h1>Void Sale Items</h1>
+            <p>Select a recent sale item to void. This will remove it from daily reports and totals.</p>
+        </div>
+
+        <div class="card">
+            <h2>Recent Sale Items</h2>
+            {% if sale_items %}
+            <table style="width:100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background: #f3f4f6; text-align: left;">
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Sale ID</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Time</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Cashier</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Item Name</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Qty</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Line Total</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #ddd;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in sale_items %}
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">#{{ item.sale_id }}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">{{ item.sale_datetime }}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">{{ item.cashier_name }}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>{{ item.item_name }}</strong></td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">{{ item.quantity }}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${{ "%.2f"|format(item.line_total) }}</td>
+                        <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                            <form action="/void_page" method="POST" style="display:flex; gap:6px; align-items:center;">
+                                <input type="hidden" name="sale_item_id" value="{{ item.sale_item_id }}">
+                                <input type="text" name="reason" placeholder="Reason for void" required style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em;">
+                                <button type="submit" class="btn" style="background:#dc2626; padding: 6px 12px; font-size: 0.9em;" onclick="return confirm('Are you sure you want to void this item?');">Void</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #6b7280; margin-top: 10px;">No recent sale items available to void.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+</html>

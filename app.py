@@ -1,0 +1,444 @@
+from datetime import datetime
+import io
+import os
+from flask import Flask, render_template, request, redirect, session, jsonify, send_file
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import sqlite3
+from werkzeug.utils import secure_filename
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key_here"
+
+UPLOAD_FOLDER = "static/uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+
+def get_db_connection():
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        # Connect to Supabase PostgreSQL in production
+        conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+        return conn
+    else:
+        # Fallback to local SQLite for local testing
+        conn = sqlite3.connect("pos.db")
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+@app.route("/")
+def index():
+    if "username" not in session:
+        return redirect("/login")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, price, image FROM items ORDER BY category_name, name")
+    items = cursor.fetchall()
+    conn.close()
+
+    return render_template("index.html", username=session["username"], role=session["role"], items=items)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM users WHERE username = ? AND password = ?",
+            (username, password),
+        )
+        user = cursor.fetchone()
+        conn.close()
+
+        if user:
+            session["username"] = user["username"]
+            session["role"] = user["role"]
+            return redirect("/")
+        else:
+            return render_template("login.html", error="Invalid credentials")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+@app.route("/admin")
+def admin():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM categories")
+    categories = cursor.fetchall()
+
+    cursor.execute(
+        "SELECT name, category_name, price, image FROM items ORDER BY category_name, name"
+    )
+    items = cursor.fetchall()
+
+    conn.close()
+    return render_template("admin.html", categories=categories, items=items)
+
+
+@app.route("/add_item", methods=["POST"])
+def add_item():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    name = request.form["name"]
+    category_name = request.form["category_name"]
+
+    price_usd_str = request.form.get("price", "")
+    price_lbp_str = request.form.get("price_lbp", "")
+
+    try:
+        if price_usd_str and float(price_usd_str) > 0:
+            price = float(price_usd_str)
+        elif price_lbp_str and float(price_lbp_str) > 0:
+            price = float(price_lbp_str) / 90000.0
+        else:
+            return "Error: A valid price in USD or LBP must be provided."
+    except ValueError:
+        return "Error: Invalid price format."
+
+    if price < 0:
+        return "Error: Price cannot be negative."
+
+    image_filename = None
+    if "image" in request.files:
+        file = request.files["image"]
+        if file and file.filename != "":
+            filename = secure_filename(file.filename)
+            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+            image_filename = filename
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO items (name, category_name, price, image)
+        VALUES (?, ?, ?, ?)
+    """,
+        (name, category_name, price, image_filename),
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect("/admin")
+
+
+@app.route("/checkout", methods=["POST"])
+def checkout():
+    if "username" not in session:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.get_json()
+    cart = data.get("cart", [])
+    total = data.get("total", 0)
+    cashier = session["username"]
+
+    if not cart:
+        return jsonify({"message": "Cart is empty"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO sales (cashier_name, total_amount, sale_datetime)
+        VALUES (?, ?, datetime('now'))
+    """,
+        (cashier, total),
+    )
+    sale_id = cursor.lastrowid
+
+    for item in cart:
+        cursor.execute(
+            """
+            INSERT INTO sale_items (sale_id, item_name, quantity, line_total)
+            VALUES (?, ?, ?, ?)
+        """,
+            (sale_id, item["name"], item["quantity"], item["line_total"]),
+        )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Checkout successful!"})
+
+
+@app.route("/daily_report")
+def daily_report():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Grand Total
+    cursor.execute(
+        """
+        SELECT COALESCE(SUM(si.line_total),0)
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        WHERE date(s.sale_datetime) = date('now')
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+    """
+    )
+    grand_total = cursor.fetchone()[0]
+
+    # Cashier Summary
+    cursor.execute(
+        """
+        SELECT s.cashier_name, SUM(si.line_total)
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        WHERE date(s.sale_datetime) = date('now')
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+        GROUP BY s.cashier_name
+    """
+    )
+    cashier_summary = dict(cursor.fetchall())
+
+    # Items summary by category
+    cursor.execute(
+        """
+        SELECT 
+            COALESCE(i.category_name, 'Uncategorized') as cat_name,
+            si.item_name, 
+            SUM(si.quantity) as total_qty, 
+            SUM(si.line_total) as total_sales
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        WHERE date(s.sale_datetime) = date('now')
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+        GROUP BY cat_name, si.item_name
+        ORDER BY cat_name
+    """
+    )
+    raw_cat_items = cursor.fetchall()
+
+    item_summary_by_category = {}
+    for row in raw_cat_items:
+        cat = row["cat_name"]
+        if cat not in item_summary_by_category:
+            item_summary_by_category[cat] = []
+        item_summary_by_category[cat].append(row)
+
+    # Voided items
+    cursor.execute(
+        """
+        SELECT v.sale_id, si.item_name, si.quantity, v.void_datetime
+        FROM void_items v
+        JOIN sale_items si ON v.sale_item_id = si.sale_item_id
+        WHERE date(v.void_datetime) = date('now')
+    """
+    )
+    voided_items = cursor.fetchall()
+
+    conn.close()
+
+    report_date = datetime.now().strftime("%Y-%m-%d")
+
+    return render_template(
+        "daily_report.html",
+        report_date=report_date,
+        grand_total=grand_total,
+        cashier_summary=cashier_summary,
+        item_summary_by_category=item_summary_by_category,
+        voided_items=voided_items,
+        username=session["username"],
+        role=session["role"],
+    )
+@app.route("/void_page", methods=["GET", "POST"])
+def void_page():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        sale_item_id = request.form.get("sale_item_id")
+        reason = request.form.get("reason", "No reason provided")
+
+        if sale_item_id:
+            cursor.execute(
+                """
+                INSERT INTO void_items (sale_item_id, void_datetime, reason)
+                VALUES (?, datetime('now'), ?)
+            """,
+                (sale_item_id, reason),
+            )
+            conn.commit()
+
+        conn.close()
+        return redirect("/void_page")
+
+    # Fetch recent sale items that are not already voided
+    cursor.execute(
+        """
+        SELECT si.sale_item_id, s.sale_id, s.cashier_name, si.item_name, si.quantity, si.line_total, s.sale_datetime
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        WHERE si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+        ORDER BY s.sale_datetime DESC
+        LIMIT 50
+    """
+    )
+    sale_items = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        "void_page.html",
+        sale_items=sale_items,
+        username=session["username"],
+        role=session["role"],
+    )
+
+@app.route("/download_report")
+def download_report():
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT 
+            COALESCE(i.category_name, 'Uncategorized') as cat_name,
+            si.item_name, 
+            SUM(si.quantity), 
+            SUM(si.line_total)
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        WHERE date(s.sale_datetime) = date('now')
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+        GROUP BY cat_name, si.item_name
+        ORDER BY cat_name
+    """
+    )
+    raw_items = cursor.fetchall()
+
+    pdf_categories = {}
+    for row in raw_items:
+        cat = row[0]
+        if cat not in pdf_categories:
+            pdf_categories[cat] = []
+        pdf_categories[cat].append((row[1], row[2], row[3]))
+
+    cursor.execute(
+        """
+        SELECT COALESCE(SUM(si.line_total),0)
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        WHERE date(s.sale_datetime)=date('now')
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+    """
+    )
+    total = cursor.fetchone()[0]
+    conn.close()
+
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer)
+
+    report_date = datetime.now().strftime("%Y-%m-%d")
+    y = 800
+
+    pdf.setFont("Helvetica-Bold", 18)
+    pdf.drawString(200, y, "Daily Sales Report")
+
+    y -= 30
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, y, f"Report Date: {report_date}")
+
+    y -= 25
+    pdf.setFont("Helvetica-Bold", 14)
+    total_lbp = total * 90000
+    pdf.drawString(50, y, f"Grand Total: ${total:.2f}  ({total_lbp:,.0f} LBP)")
+
+    y -= 35
+
+    for category_name, items in pdf_categories.items():
+        if y < 120:
+            pdf.showPage()
+            y = 800
+
+        cat_total = sum(item[2] for item in items)
+        cat_total_lbp = cat_total * 90000
+
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(50, y, f"Category: {category_name}")
+
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawRightString(
+            550, y, f"Subtotal: ${cat_total:.2f} ({cat_total_lbp:,.0f} LBP)"
+        )
+
+        y -= 20
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(60, y, "Item Name")
+        pdf.drawString(240, y, "Qty")
+        pdf.drawString(320, y, "Sales Total")
+        y -= 15
+
+        pdf.setFont("Helvetica", 10)
+        for item in items:
+            if y < 50:
+                pdf.showPage()
+                y = 800
+            item_sales_lbp = item[2] * 90000
+            pdf.drawString(60, y, str(item[0]))
+            pdf.drawString(240, y, str(item[1]))
+            pdf.drawString(320, y, f"${item[2]:.2f} ({item_sales_lbp:,.0f} LBP)")
+            y -= 15
+        y -= 15
+
+    pdf.setFont("Helvetica-Oblique", 8)
+    pdf.setFillColorRGB(0.4, 0.4, 0.4)
+    pdf.drawCentredString(300, 30, "POS Management System")
+
+    pdf.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="daily_report.pdf",
+        mimetype="application/pdf",
+    )
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

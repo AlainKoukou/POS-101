@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Daily Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="topbar">
+        Logged in as: <strong>{{ username }}</strong> ({{ role }})
+        <span style="float:right;">
+            <a href="/logout">Logout</a>
+            <a href="/">POS</a>
+            <a href="/admin">Admin</a>
+            <a href="/void_page">Void Page</a>
+        </span>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+            <div class="report-header">
+                <div class="report-title">
+                    <h1>Daily Sales Report</h1>
+                    <p class="muted">Report Date: <strong>{{ report_date }}</strong></p>
+                </div>
+
+                <div class="actions-row">
+                    <form action="/download_report">
+                        <button type="submit" class="btn">Download PDF</button>
+                    </form>
+
+                    <form action="/reset_today" method="POST">
+                        <button type="submit" class="danger-btn">Reset Today Report</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-box">
+                <h3>Grand Total</h3>
+                <div class="value">${{ "%.2f"|format(grand_total) }}</div>
+                <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(grand_total * 90000) }} LBP</div>
+            </div>
+
+            <div class="summary-box">
+                <h3>Cashiers Active Today</h3>
+                <div class="value">{{ cashier_summary|length }}</div>
+            </div>
+
+            <div class="summary-box">
+                <h3>Items Sold Types</h3>
+                <div class="value">{{ item_summary_by_category.values() | map('length') | sum }}</div>
+            </div>
+
+            <div class="summary-box">
+                <h3>Voided Entries</h3>
+                <div class="value">{{ voided_items|length }}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Cashier Totals</h2>
+
+            {% if cashier_summary %}
+            <table>
+                <tr>
+                    <th>Cashier</th>
+                    <th>Total Sales</th>
+                </tr>
+                {% for cashier_name, total_sales in cashier_summary.items() %}
+                <tr>
+                    <td>{{ cashier_name }}</td>
+                    <td>
+                        ${{ "%.2f"|format(total_sales) }} 
+                        <br><small style="color: gray;">({{ "%.0f"|format(total_sales * 90000) }} LBP)</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="report-table-empty">No cashier activity recorded for today.</div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Items Summary by Category</h2>
+
+            {% if item_summary_by_category %}
+                {% for category_name, items in item_summary_by_category.items() %}
+                {% set cat_total = items | sum(attribute='total_sales') %}
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; margin-top: 25px; padding-bottom: 8px;">
+                    <h3 style="margin: 0; color: #333;">{{ category_name }}</h3>
+                    <span style="font-weight: bold; color: #4b5563; font-size: 0.95em;">
+                        Subtotal: ${{ "%.2f"|format(cat_total) }} 
+                        <small style="color: gray; font-weight: normal;">({{ "%.0f"|format(cat_total * 90000) }} LBP)</small>
+                    </span>
+                </div>
+
+                <table>
+                    <tr>
+                        <th>Item Name</th>
+                        <th>Total Quantity Sold</th>
+                        <th>Total Sales</th>
+                    </tr>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.item_name }}</td>
+                        <td>{{ item.total_qty }}</td>
+                        <td>
+                            ${{ "%.2f"|format(item.total_sales) }} 
+                            <br><small style="color: gray;">({{ "%.0f"|format(item.total_sales * 90000) }} LBP)</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% endfor %}
+            {% else %}
+            <div class="report-table-empty">No sales recorded for today.</div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Voided Items</h2>
+
+            {% if voided_items %}
+            <table>
+                <tr>
+                    <th>Sale ID</th>
+                    <th>Item</th>
+                    <th>Quantity Voided</th>
+                    <th>Void Time</th>
+                </tr>
+                {% for voided in voided_items %}
+                <tr>
+                    <td>{{ voided[0] }}</td>
+                    <td>{{ voided[1] }}</td>
+                    <td>{{ voided[2] }}</td>
+                    <td>{{ voided[3] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="report-table-empty">No voided items recorded for today.</div>
+            {% endif %}
+        </div>
+
+    </div>
+
+</body>
+
+</html>
