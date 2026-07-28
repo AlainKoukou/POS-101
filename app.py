@@ -651,7 +651,7 @@ def download_report():
 
     pdf.setFont("Helvetica-Oblique", 8)
     pdf.setFillColorRGB(0.4, 0.4, 0.4)
-    pdf.drawCentredString(300, 30, "POS Management System")
+    pdf.drawCentredString(300, 30, "Developed by Alain Koukou")
 
     pdf.save()
     buffer.seek(0)
