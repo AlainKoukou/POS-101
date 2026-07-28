@@ -62,7 +62,11 @@ def login():
             return redirect("/")
         else:
             return render_template("login.html", error="Invalid credentials")
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users ORDER BY username")
+    usernames = cursor.fetchall()
+    conn.close()
     return render_template("login.html")
 
 
