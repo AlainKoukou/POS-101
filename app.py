@@ -358,7 +358,6 @@ def checkout():
     conn.close()
 
     return jsonify({"message": "Checkout successful!"})
-
 @app.route("/daily_report")
 def daily_report():
     if "role" not in session or session["role"] != "admin":
@@ -367,7 +366,6 @@ def daily_report():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Example query adjustment ensuring proper column references
     cursor.execute("""
         SELECT si.sale_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
         FROM sale_items si
@@ -377,10 +375,19 @@ def daily_report():
     
     report_items = cursor.fetchall()
     
+    # Calculate the grand total from the line totals
+    grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
+
     cursor.close()
     conn.close()
 
-    return render_template("daily_report.html", report_items=report_items, username=session["username"], role=session["role"])
+    return render_template(
+        "daily_report.html", 
+        report_items=report_items, 
+        grand_total=grand_total, 
+        username=session["username"], 
+        role=session["role"]
+    )
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
