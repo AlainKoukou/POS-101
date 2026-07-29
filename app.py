@@ -121,7 +121,7 @@ def update_price():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. If a new image was uploaded, save it and update the image column
+    # 1. If an image file was selected, save it and update the image column
     if file and file.filename != "":
         filename = secure_filename(file.filename)
         upload_folder = os.path.join("static", "uploads")
@@ -133,7 +133,7 @@ def update_price():
             (filename, item_name)
         )
 
-    # 2. If a new price was provided, update the price column
+    # 2. If a new price was typed, update the price column
     if new_price and new_price.strip() != "":
         cursor.execute(
             "UPDATE items SET price = %s WHERE name = %s",
