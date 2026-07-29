@@ -419,7 +419,7 @@ def daily_report():
     cursor.execute("""
         SELECT v.id, si.item_name, si.line_total, v.void_datetime 
         FROM void_items v
-        JOIN sale_items si ON v.sale_item_id = si.sale_item_id
+        JOIN sale_items si ON v.sale_item_id = si.sale_id
         ORDER BY v.void_datetime DESC
     """)
     voided_items = cursor.fetchall()
