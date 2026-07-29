@@ -208,5 +208,11 @@ a:hover {
     min-width: 180px;
     min-height: 200px; /* Increases the height of the box */
     padding: 20px;     /* Gives more breathing room inside the box */
-    font-size: 20px;   /* Makes text easier to read */
+    font-size: 24px;   /* Makes text easier to read */
+}
+
+.item-card h3, .item-btn h3, .item-name {
+    font-size: 24px;         
+    text-transform: uppercase; 
+    font-weight: bold;
 }
