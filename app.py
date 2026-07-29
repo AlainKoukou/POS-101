@@ -492,31 +492,9 @@ def reset_today():
         cursor = conn.cursor()
         
         # 1. Completely delete all void records linked to today's sale items
-        cursor.execute("""
-            DELETE FROM void_items 
-            WHERE sale_item_id IN (
-                SELECT si.sale_item_id 
-                FROM sale_items si 
-                JOIN sales s ON si.sale_id = s.sale_id 
-                WHERE DATE(s.sale_datetime) = CURRENT_DATE
-            )
-        """)
-        
-        # 2. Delete today's sale items
-        cursor.execute("""
-            DELETE FROM sale_items 
-            WHERE sale_id IN (
-                SELECT sale_id 
-                FROM sales 
-                WHERE DATE(sale_datetime) = CURRENT_DATE
-            )
-        """)
-        
-        # 3. Delete today's sales records
-        cursor.execute("""
-            DELETE FROM sales 
-            WHERE DATE(sale_datetime) = CURRENT_DATE
-        """)
+        cursor.execute("DELETE FROM void_items")
+        cursor.execute("DELETE FROM sale_items")
+        cursor.execute("DELETE FROM sales")
         
         conn.commit()
         cursor.close()
