@@ -34,7 +34,7 @@ def index():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name, price, image FROM items ORDER BY category_name, name")
+    cursor.execute("SELECT name, price, name")
     items = cursor.fetchall()
     conn.close()
 
@@ -82,7 +82,7 @@ def admin():
     categories = cursor.fetchall()
 
     cursor.execute(
-        "SELECT name, category_name, price, image FROM items ORDER BY category_name, name"
+        "SELECT name, category_name, price, name"
     )
     items = cursor.fetchall()
 
@@ -189,12 +189,11 @@ def add_item():
         
         cursor.execute(
             """
-            INSERT INTO items (name, category_name, price, image)
+            INSERT INTO items (name, category_name, price)
             VALUES (%s, %s, %s)
             ON CONFLICT (name) DO UPDATE 
             SET category_name = EXCLUDED.category_name, 
                 price = EXCLUDED.price, 
-                image = COALESCE(EXCLUDED.image, items.image)
             """,
             (name, category_name, price),
         )
