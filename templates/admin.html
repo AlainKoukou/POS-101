@@ -187,7 +187,7 @@
                         <form action="/update_price" method="POST" enctype="multipart/form-data"
                             style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <input type="hidden" name="name" value="{{ item.name }}">
-                            <input type="number" step="0.01" name="new_price" placeholder="USD" required>
+                            <input type="number" step="0.01" name="new_price" placeholder="USD">
                             <input type="file" name="image" accept="image/*" style="max-width: 180px;">
                             <button type="submit" class="btn">Update</button>
                         </form>
