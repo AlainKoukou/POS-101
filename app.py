@@ -491,18 +491,18 @@ def reset_today():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 1. Delete void records linked to today's sale items
+        # Force delete void items created today based on their timestamp or link
         cursor.execute("""
             DELETE FROM void_items 
-            WHERE sale_item_id IN (
-                SELECT si.sale_item_id 
-                FROM sale_items si 
-                JOIN sales s ON si.sale_id = s.sale_id 
-                WHERE DATE(s.sale_datetime) = CURRENT_DATE
-            )
+            WHERE DATE(void_datetime) = CURRENT_DATE
+               OR sale_item_id IN (
+                  SELECT si.sale_item_id 
+                  FROM sale_items si 
+                  JOIN sales s ON si.sale_id = s.sale_id 
+                  WHERE DATE(s.sale_datetime) = CURRENT_DATE
+               )
         """)
         
-        # 2. Delete today's sale items
         cursor.execute("""
             DELETE FROM sale_items 
             WHERE sale_id IN (
@@ -512,7 +512,6 @@ def reset_today():
             )
         """)
         
-        # 3. Delete today's sales records
         cursor.execute("""
             DELETE FROM sales 
             WHERE DATE(sale_datetime) = CURRENT_DATE
