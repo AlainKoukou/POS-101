@@ -498,7 +498,6 @@ def reset_today():
                 SELECT si.sale_item_id 
                 FROM sale_items si 
                 JOIN sales s ON si.sale_id = s.sale_id 
-                WHERE DATE(s.sale_datetime) = CURRENT_DATE
             )
         """)
         
