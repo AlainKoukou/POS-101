@@ -444,7 +444,7 @@ def void_page():
             cursor.execute(
                 """
                 INSERT INTO void_items (sale_item_id, void_datetime)
-                VALUES (%s, NOW(), %s)
+                VALUES (%s, NOW())
             """,
                 (sale_item_id),
             )
