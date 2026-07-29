@@ -67,7 +67,7 @@ def login():
     cursor.execute("SELECT username FROM users ORDER BY username")
     usernames = cursor.fetchall()
     conn.close()
-    return render_template("login.html")
+    return render_template("login.html", usernames=usernames)
 
 
 @app.route("/admin")
