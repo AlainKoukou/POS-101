@@ -114,22 +114,10 @@ def update_price():
 
     item_name = request.form.get("name")
     new_price = request.form.get("new_price")
-    file = request.files.get("image")
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. If an image file was selected, save it and update the image column
-    if file and file.filename != "":
-        filename = secure_filename(file.filename)
-        upload_folder = os.path.join("static", "uploads")
-        os.makedirs(upload_folder, exist_ok=True)
-        file.save(os.path.join(upload_folder, filename))
-
-        cursor.execute(
-            "UPDATE items SET image = %s WHERE name = %s",
-            (filename, item_name)
-        )
 
     # 2. If a new price was typed, update the price column
     if new_price and new_price.strip() != "":
@@ -194,14 +182,6 @@ def add_item():
     if price < 0:
         return "Error: Price cannot be negative."
 
-    image_filename = None
-    if "image" in request.files:
-        file = request.files["image"]
-        if file and file.filename != "":
-            filename = secure_filename(file.filename)
-            os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-            image_filename = filename
 
     try:
         conn = get_db_connection()
@@ -210,13 +190,13 @@ def add_item():
         cursor.execute(
             """
             INSERT INTO items (name, category_name, price, image)
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s)
             ON CONFLICT (name) DO UPDATE 
             SET category_name = EXCLUDED.category_name, 
                 price = EXCLUDED.price, 
                 image = COALESCE(EXCLUDED.image, items.image)
             """,
-            (name, category_name, price, image_filename),
+            (name, category_name, price),
         )
         conn.commit()
         conn.close()
