@@ -413,9 +413,9 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
-    # Fixed: Removed reference to non-existent v.id and selected safe columns
+    # Fixed: Selecting line_total as 'price' so template item.price works seamlessly
     cursor.execute("""
-        SELECT si.item_name, si.line_total, v.void_datetime 
+        SELECT si.item_name, si.line_total as price, v.void_datetime 
         FROM void_items v
         JOIN sale_items si ON v.sale_item_id = si.sale_item_id
         ORDER BY v.void_datetime DESC
@@ -434,7 +434,6 @@ def daily_report():
         username=session["username"], 
         role=session["role"]
     )
-
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
