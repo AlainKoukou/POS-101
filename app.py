@@ -34,7 +34,7 @@ def index():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name, price, name")
+    cursor.execute("SELECT name, price FROM items")
     items = cursor.fetchall()
     conn.close()
 
@@ -82,7 +82,7 @@ def admin():
     categories = cursor.fetchall()
 
     cursor.execute(
-        "SELECT name, category_name, price, name"
+        "SELECT name, category_name, price FROM items"
     )
     items = cursor.fetchall()
 
@@ -91,7 +91,6 @@ def admin():
 
     conn.close()
     
-    # Added username and role to fix the empty display header
     return render_template(
         "admin.html", 
         categories=categories, 
@@ -100,6 +99,7 @@ def admin():
         username=session.get("username"), 
         role=session.get("role")
     )
+
 
 @app.route("/logout")
 def logout():
@@ -118,8 +118,6 @@ def update_price():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-
-    # 2. If a new price was typed, update the price column
     if new_price and new_price.strip() != "":
         cursor.execute(
             "UPDATE items SET price = %s WHERE name = %s",
@@ -129,6 +127,7 @@ def update_price():
     conn.commit()
     conn.close()
     return redirect("/admin")
+
 
 @app.route("/add_user", methods=["POST"])
 def add_user():
@@ -182,7 +181,6 @@ def add_item():
     if price < 0:
         return "Error: Price cannot be negative."
 
-
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -193,7 +191,7 @@ def add_item():
             VALUES (%s, %s, %s)
             ON CONFLICT (name) DO UPDATE 
             SET category_name = EXCLUDED.category_name, 
-                price = EXCLUDED.price, 
+                price = EXCLUDED.price
             """,
             (name, category_name, price),
         )
@@ -353,6 +351,7 @@ def checkout():
 
     return jsonify({"message": "Checkout successful!"})
 
+
 @app.route("/daily_report")
 def daily_report():
     if "role" not in session or session["role"] != "admin":
@@ -392,7 +391,6 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
-    # Fixed: Selecting line_total as 'price' so template item.price works seamlessly
     cursor.execute("""
         SELECT si.item_name, si.line_total as price, v.void_datetime 
         FROM void_items v
@@ -413,6 +411,7 @@ def daily_report():
         username=session["username"], 
         role=session["role"]
     )
+
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
@@ -470,7 +469,6 @@ def reset_today():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 1. Completely delete all void records linked to today's sale items
         cursor.execute("DELETE FROM void_items")
         cursor.execute("DELETE FROM sale_items")
         cursor.execute("DELETE FROM sales")
@@ -482,6 +480,7 @@ def reset_today():
         print(f"Error resetting today's sales: {e}")
 
     return redirect("/daily_report")
+
 
 @app.route("/add_category", methods=["POST"])
 def add_category():
