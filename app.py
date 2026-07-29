@@ -106,8 +106,6 @@ def logout():
     session.clear()
     return redirect("/login")
 
-import os
-from werkzeug.utils import secure_filename
 
 @app.route("/update_price", methods=["POST"])
 def update_price():
@@ -415,11 +413,11 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
-    # Fixed: Using si.sale_item_id instead of si.id
+    # Fixed: Removed reference to non-existent v.id and selected safe columns
     cursor.execute("""
-        SELECT v.id, si.item_name, si.line_total, v.void_datetime 
+        SELECT si.item_name, si.line_total, v.void_datetime 
         FROM void_items v
-        JOIN sale_items si ON v.sale_item_id = si.sale_id
+        JOIN sale_items si ON v.sale_item_id = si.sale_item_id
         ORDER BY v.void_datetime DESC
     """)
     voided_items = cursor.fetchall()
@@ -494,7 +492,6 @@ def reset_today():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Fixed: Using si.sale_item_id here as well
         cursor.execute("""
             DELETE FROM void_items 
             WHERE sale_item_id IN (
