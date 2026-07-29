@@ -134,7 +134,8 @@
                 </tr>
                 {% for item in voided_items %}
                 <tr>
-                    <td>{{ item.name }}</td>
+                    <!-- Fixed: Changed item.name to item.item_name to match backend query -->
+                    <td>{{ item.item_name }}</td>
                     <td>${{ "%.2f"|format(item.price) }}</td>
                     <td>{{ item.void_datetime }}</td>
                 </tr>
