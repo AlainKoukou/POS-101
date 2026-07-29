@@ -494,6 +494,12 @@ def reset_today():
         # 1. Completely delete all void records linked to today's sale items
         cursor.execute("""
             DELETE FROM void_items 
+            WHERE sale_item_id IN (
+                SELECT si.sale_item_id 
+                FROM sale_items si 
+                JOIN sales s ON si.sale_id = s.sale_id 
+                WHERE DATE(s.sale_datetime) = CURRENT_DATE
+            )
         """)
         
         # 2. Delete today's sale items
