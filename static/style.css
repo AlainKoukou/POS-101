@@ -205,8 +205,8 @@ a:hover {
 }
 
 .item-card, .item-btn {
-    min-width: 160px;
-    min-height: 180px; /* Increases the height of the box */
+    min-width: 180px;
+    min-height: 200px; /* Increases the height of the box */
     padding: 20px;     /* Gives more breathing room inside the box */
-    font-size: 16px;   /* Makes text easier to read */
+    font-size: 20px;   /* Makes text easier to read */
 }
