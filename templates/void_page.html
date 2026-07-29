@@ -49,7 +49,6 @@
                         <td style="padding: 10px; border-bottom: 1px solid #ddd;">
                             <form action="/void_page" method="POST" style="display:flex; gap:6px; align-items:center;">
                                 <input type="hidden" name="sale_item_id" value="{{ item.sale_item_id }}">
-                                <input type="text" name="reason" placeholder="Reason for void" required style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em;">
                                 <button type="submit" class="btn" style="background:#dc2626; padding: 6px 12px; font-size: 0.9em;" onclick="return confirm('Are you sure you want to void this item?');">Void</button>
                             </form>
                         </td>
