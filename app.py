@@ -439,15 +439,14 @@ def void_page():
 
     if request.method == "POST":
         sale_item_id = request.form.get("sale_item_id")
-        reason = request.form.get("reason", "No reason provided")
 
         if sale_item_id:
             cursor.execute(
                 """
-                INSERT INTO void_items (sale_item_id, void_datetime, reason)
+                INSERT INTO void_items (sale_item_id, void_datetime)
                 VALUES (%s, NOW(), %s)
             """,
-                (sale_item_id, reason),
+                (sale_item_id),
             )
             conn.commit()
 
