@@ -125,28 +125,25 @@
         </div>
 
         <div class="card">
-            <h2 class="section-title">Voided Items</h2>
-
-            {% if voided_items %}
+            <h2>Voided Items</h2>
             <table>
                 <tr>
-                    <th>Sale ID</th>
-                    <th>Item</th>
-                    <th>Quantity Voided</th>
+                    <th>Item Name</th>
+                    <th>Price</th>
                     <th>Void Time</th>
                 </tr>
-                {% for voided in voided_items %}
+                {% for item in voided_items %}
                 <tr>
-                    <td>{{ voided[0] }}</td>
-                    <td>{{ voided[1] }}</td>
-                    <td>{{ voided[2] }}</td>
-                    <td>{{ voided[3] }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>${{ "%.2f"|format(item.price) }}</td>
+                    <td>{{ item.void_datetime }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="muted">No items voided today.</td>
                 </tr>
                 {% endfor %}
             </table>
-            {% else %}
-            <div class="report-table-empty">No voided items recorded for today.</div>
-            {% endif %}
         </div>
 
     </div>
