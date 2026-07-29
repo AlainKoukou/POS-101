@@ -376,7 +376,6 @@ def checkout():
 
     return jsonify({"message": "Checkout successful!"})
 
-
 @app.route("/daily_report")
 def daily_report():
     if "role" not in session or session["role"] != "admin":
@@ -416,11 +415,11 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
-    # Added query to fetch voided items
+    # Fixed: Using si.sale_item_id instead of si.id
     cursor.execute("""
         SELECT v.id, si.item_name, si.line_total, v.void_datetime 
         FROM void_items v
-        JOIN sale_items si ON v.sale_item_id = si.id
+        JOIN sale_items si ON v.sale_item_id = si.sale_item_id
         ORDER BY v.void_datetime DESC
     """)
     voided_items = cursor.fetchall()
@@ -437,6 +436,7 @@ def daily_report():
         username=session["username"], 
         role=session["role"]
     )
+
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
@@ -494,7 +494,7 @@ def reset_today():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Clear void references and sale items for today's sales first to maintain constraints, then delete sales
+        # Fixed: Using si.sale_item_id here as well
         cursor.execute("""
             DELETE FROM void_items 
             WHERE sale_item_id IN (
@@ -526,7 +526,6 @@ def reset_today():
         print(f"Error resetting today's sales: {e}")
 
     return redirect("/daily_report")
-
 
 @app.route("/add_category", methods=["POST"])
 def add_category():
