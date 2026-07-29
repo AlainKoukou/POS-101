@@ -375,7 +375,7 @@ def daily_report():
             COALESCE(i.category_name, 'Uncategorized') as category_name,
             si.item_name, 
             SUM(si.line_total) as total_sales, 
-            SUM(si.quantity) as total_quantity
+            SUM(si.quantity) as total_quantity_sold
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
