@@ -416,6 +416,15 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
+    # Added query to fetch voided items
+    cursor.execute("""
+        SELECT v.id, si.item_name, si.line_total, v.void_datetime 
+        FROM void_items v
+        JOIN sale_items si ON v.sale_item_id = si.id
+        ORDER BY v.void_datetime DESC
+    """)
+    voided_items = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
@@ -424,10 +433,10 @@ def daily_report():
         report_items=report_items, 
         grand_total=grand_total, 
         item_summary_by_category=item_summary_by_category,
+        voided_items=voided_items,
         username=session["username"], 
         role=session["role"]
     )
-
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
