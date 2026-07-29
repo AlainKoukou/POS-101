@@ -446,7 +446,7 @@ def void_page():
                 INSERT INTO void_items (sale_item_id, void_datetime)
                 VALUES (%s, NOW())
             """,
-                (sale_item_id,),
+                [sale_item_id]
             )
             conn.commit()
 
