@@ -491,6 +491,7 @@ def reset_today():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # 1. Delete void records linked to today's sale items
         cursor.execute("""
             DELETE FROM void_items 
             WHERE sale_item_id IN (
@@ -501,6 +502,7 @@ def reset_today():
             )
         """)
         
+        # 2. Delete today's sale items
         cursor.execute("""
             DELETE FROM sale_items 
             WHERE sale_id IN (
@@ -510,6 +512,7 @@ def reset_today():
             )
         """)
         
+        # 3. Delete today's sales records
         cursor.execute("""
             DELETE FROM sales 
             WHERE DATE(sale_datetime) = CURRENT_DATE
