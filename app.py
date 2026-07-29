@@ -106,6 +106,40 @@ def logout():
     session.clear()
     return redirect("/login")
 
+@app.route("/update_item/<int:item_id>", methods=["POST"])
+def update_item(item_id):
+    if "role" not in session or session["role"] != "admin":
+        return redirect("/login")
+
+    new_price = request.form.get("price")
+    file = request.files.get("image")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # If a new image was uploaded, process and save it
+    if file and file.filename != "":
+        filename = secure_filename(file.filename)
+        upload_folder = os.path.join("static", "uploads")
+        os.makedirs(upload_folder, exist_ok=True)
+        file.save(os.path.join(upload_folder, filename))
+
+        # Update price and image in database
+        cursor.execute(
+            "UPDATE items SET price = %s, image = %s WHERE id = %s",
+            (new_price, filename, item_id)
+        )
+    else:
+        # Update price only
+        cursor.execute(
+            "UPDATE items SET price = %s WHERE id = %s",
+            (new_price, item_id)
+        )
+
+    conn.commit()
+    conn.close()
+    return redirect("/admin")
+
 @app.route("/add_user", methods=["POST"])
 def add_user():
     if "role" not in session or session["role"] != "admin":
