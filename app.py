@@ -349,7 +349,14 @@ def checkout():
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "Checkout successful!"})
+    return jsonify({
+        "message": "Checkout successful!",
+        "sale_id": sale_id,
+        "sale_datetime": sale_datetime,
+        "cashier": cashier,
+        "cart": cart,
+        "total": total
+    })
 
 
 @app.route("/daily_report")

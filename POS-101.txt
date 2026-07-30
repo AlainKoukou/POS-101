@@ -1,0 +1,13 @@
+POS-101
+
+Cashier_1       cashier_1
+Alain           alain140104
+
+render domain:
+
+https://pos-101.onrender.com/
+
+
+DataBase:
+
+https://supabase.com/dashboard/project/jjppxixiylekaceiaekl/database/schemas
