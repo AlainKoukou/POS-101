@@ -4,31 +4,7 @@
 <head>
     <title>POS System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        /* Hidden Receipt by default on screen */
-        #receipt-section {
-            display: none;
-        }
 
-        /* Print media rules: Only show and print the receipt section when window.print() runs */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #receipt-section, #receipt-section * {
-                visibility: visible;
-            }
-            #receipt-section {
-                display: block !important;
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 0;
-            }
-        }
-    </style>
 </head>
 
 <body>
