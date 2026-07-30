@@ -329,13 +329,14 @@ def checkout():
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
         VALUES (%s, %s, NOW())
-        RETURNING sale_id
+        RETURNING sale_id, sale_datetime
     """,
         (cashier, total),
     )
     
-    sale_id_row = cursor.fetchone()
-    sale_id = sale_id_row["sale_id"] if sale_id_row else None
+    sale_row = cursor.fetchone()
+    sale_id = sale_row["sale_id"] if sale_row else None
+    sale_datetime = str(sale_row["sale_datetime"]) if sale_row else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for item in cart:
         cursor.execute(
