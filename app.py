@@ -478,16 +478,9 @@ def void_page():
 
     if search_query:
         query += """ AND (
-            CAST(s.sale_id AS TEXT) ILIKE %s OR
-            CAST(s.sale_datetime AS TEXT) ILIKE %s OR
-            s.cashier_name ILIKE %s OR
-            si.item_name ILIKE %s OR
-            CAST(si.quantity AS TEXT) ILIKE %s OR
-            CAST(si.line_total AS TEXT) ILIKE %s
+            CAST(s.sale_id AS TEXT) ILIKE %s
         )"""
-        search_pattern = f"%{search_query}%"
-        params.extend([search_pattern] * 6)
-
+        params.append(f"%{search_query}%")
     if selected_category:
         query += " AND i.category_name = %s"
         params.append(selected_category)
