@@ -114,15 +114,26 @@ def update_price():
 
     item_name = request.form.get("name")
     new_price = request.form.get("new_price")
+    new_price_lbp = request.form.get("new_price_lbp")
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if new_price and new_price.strip() != "":
-        cursor.execute(
-            "UPDATE items SET price = %s WHERE name = %s",
-            (float(new_price), item_name)
-        )
+    try:
+        if new_price and new_price.strip() != "":
+            cursor.execute(
+                "UPDATE items SET price = %s WHERE name = %s",
+                (float(new_price), item_name)
+            )
+        elif new_price_lbp and new_price_lbp.strip() != "":
+            converted_price = round(float(new_price_lbp) / 90000.0, 4)
+            cursor.execute(
+                "UPDATE items SET price = %s WHERE name = %s",
+                    (converted_price, item_name)
+            )
+    except ValueError:
+        pass  # Ignored if an invalid number format was accidentally sent
+
 
     conn.commit()
     conn.close()
