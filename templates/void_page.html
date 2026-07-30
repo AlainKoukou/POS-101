@@ -22,6 +22,29 @@
             <p>Select a recent sale item to void. This will remove it from daily reports and totals.</p>
         </div>
 
+        <!-- Filter and Search Form -->
+        <div class="card">
+            <form method="GET" action="/void_page" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">Search All Columns:</label>
+                    <input type="text" name="search" value="{{ search_query }}" placeholder="Search ID, item, cashier..." style="padding: 8px; width: 220px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">Filter by Category:</label>
+                    <select name="category" style="padding: 8px; width: 180px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.name }}" {% if selected_category == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="align-self: flex-end; display: flex; gap: 8px;">
+                    <button type="submit" class="btn" style="padding: 9px 16px;">Filter</button>
+                    <a href="/void_page" class="btn" style="background: #6b7280; text-decoration: none; padding: 9px 16px; display:inline-block;">Reset</a>
+                </div>
+            </form>
+        </div>
+
         <div class="card">
             <h2>Recent Sale Items</h2>
             {% if sale_items %}
@@ -57,7 +80,7 @@
                 </tbody>
             </table>
             {% else %}
-            <p style="color: #6b7280; margin-top: 10px;">No recent sale items available to void.</p>
+            <p style="color: #6b7280; margin-top: 10px;">No matching sale items available to void.</p>
             {% endif %}
         </div>
     </div>

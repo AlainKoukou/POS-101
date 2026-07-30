@@ -457,24 +457,53 @@ def void_page():
         conn.close()
         return redirect("/void_page")
 
-    cursor.execute(
-        """
-        SELECT si.sale_item_id, s.sale_id, s.cashier_name, si.item_name, si.quantity, si.line_total, s.sale_datetime
+    search_query = request.args.get("search", "").strip()
+    selected_category = request.args.get("category", "").strip()
+
+    # Fetch categories for the filter dropdown
+    cursor.execute("SELECT name FROM categories ORDER BY name ASC")
+    categories = cursor.fetchall()
+
+    # Build dynamic query to search across columns and filter by category
+    query = """
+        SELECT si.sale_item_id, s.sale_id, s.cashier_name, si.item_name, si.quantity, si.line_total, s.sale_datetime, i.category_name
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
         WHERE si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
-        ORDER BY s.sale_datetime DESC
-        LIMIT 50
     """
-    )
+    params = []
+
+    if search_query:
+        query += """ AND (
+            CAST(s.sale_id AS TEXT) ILIKE %s OR
+            CAST(s.sale_datetime AS TEXT) ILIKE %s OR
+            s.cashier_name ILIKE %s OR
+            si.item_name ILIKE %s OR
+            CAST(si.quantity AS TEXT) ILIKE %s OR
+            CAST(si.line_total AS TEXT) ILIKE %s
+        )"""
+        search_pattern = f"%{search_query}%"
+        params.extend([search_pattern] * 6)
+
+    if selected_category:
+        query += " AND i.category_name = %s"
+        params.append(selected_category)
+
+    query += " ORDER BY s.sale_datetime DESC LIMIT 100"
+
+    cursor.execute(query, params)
     sale_items = cursor.fetchall()
     conn.close()
 
     return render_template(
         "void_page.html",
         sale_items=sale_items,
+        categories=categories,
+        search_query=search_query,
+        selected_category=selected_category,
         username=session["username"],
         role=session["role"],
     )
