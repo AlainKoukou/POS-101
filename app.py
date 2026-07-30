@@ -172,7 +172,7 @@ def add_item():
         if price_usd_str and float(price_usd_str) > 0:
             price = float(price_usd_str)
         elif price_lbp_str and float(price_lbp_str) > 0:
-            price = float(price_lbp_str) / 90000.0
+            price = round(float(price_lbp_str) / 90000.0, 4)
         else:
             return "Error: A valid price in USD or LBP must be provided."
     except ValueError:
