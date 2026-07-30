@@ -253,7 +253,42 @@ function checkout() {
             });
         }
     </script>
-
+    <div id="receipt-section">
+        <div class="thermal-receipt">
+            <!-- Future Logo Placeholder (uncomment and adjust path when ready): -->
+            <!-- <img src="{{ url_for('static', filename='uploads/logo.png') }}" class="receipt-logo"> -->
+            
+            <div class="receipt-header">POS-101</div>
+            <div style="text-align: center; font-size: 12px;">Energy International SARL</div>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <div>Receipt ID: <span id="rec-sale-id"></span></div>
+            <div>Date: <span id="rec-date"></span></div>
+            <div>Cashier: <span id="rec-cashier"></span></div>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #000;">
+                        <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
+                        <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
+                        <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
+                    </tr>
+                </thead>
+                <tbody id="rec-items-body">
+                    <!-- Injected items go here -->
+                </tbody>
+            </table>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <div style="text-align: right; font-weight: bold; font-size: 16px;">
+                Total: $<span id="rec-total"></span>
+            </div>
+            <div style="text-align: right; font-size: 13px;">
+                Total LBP: <span id="rec-total-lbp"></span> LBP
+            </div>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <div style="text-align: center; font-size: 12px;">Thank you for your business!</div>
+            <div style="text-align: center; font-size: 10px; margin-top: 4px;">Developed by Alain Koukou</div>
+        </div>
+    </div>
 </body>
 
 </html>
