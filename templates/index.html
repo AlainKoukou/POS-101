@@ -4,7 +4,31 @@
 <head>
     <title>POS System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Hidden Receipt by default on screen */
+        #receipt-section {
+            display: none;
+        }
 
+        /* Print media rules: Only show and print the receipt section when window.print() runs */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #receipt-section, #receipt-section * {
+                visibility: visible;
+            }
+            #receipt-section {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -56,41 +80,6 @@
                 </div>
             </div>
 
-        </div>
-    </div>
-
-    <!-- Hidden Printable Thermal Receipt Layout -->
-    <div id="receipt-section">
-        <div style="width: 280px; font-family: monospace; font-size: 12px; padding: 5px; color: #000;">
-            <div style="text-align: center; font-weight: bold; font-size: 16px;">POS-101</div>
-            <div style="text-align: center; font-size: 11px;">Energy International SARL</div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div>Receipt ID: <span id="rec-sale-id"></span></div>
-            <div>Date: <span id="rec-date"></span></div>
-            <div>Cashier: <span id="rec-cashier"></span></div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 1px solid #000;">
-                        <th style="text-align: left;">Item</th>
-                        <th style="text-align: center;">Qty</th>
-                        <th style="text-align: right;">Price</th>
-                    </tr>
-                </thead>
-                <tbody id="rec-items-body">
-                    <!-- Injected items go here -->
-                </tbody>
-            </table>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: right; font-weight: bold; font-size: 13px;">
-                Total: $<span id="rec-total"></span>
-            </div>
-            <div style="text-align: right; font-size: 11px;">
-                Total LBP: <span id="rec-total-lbp"></span> LBP
-            </div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: center; font-size: 10px;">Thank you for your business!</div>
-            <div style="text-align: center; font-size: 9px; margin-top: 4px;">Developed by Alain Koukou</div>
         </div>
     </div>
 
@@ -179,7 +168,7 @@
             document.getElementById("total-lbp").textContent = Math.round(total * EXCHANGE_RATE).toLocaleString();
         }
 
-function checkout() {
+        function checkout() {
             if (cart.length === 0) {
                 alert("Cart is empty");
                 return;
@@ -197,14 +186,12 @@ function checkout() {
             })
             .then(response => response.json())
             .then(data => {
-                // Populate receipt metadata
                 document.getElementById("rec-sale-id").textContent = data.sale_id;
                 document.getElementById("rec-date").textContent = data.sale_datetime;
                 document.getElementById("rec-cashier").textContent = data.cashier;
                 document.getElementById("rec-total").textContent = data.total.toFixed(2);
                 document.getElementById("rec-total-lbp").textContent = Math.round(data.total * EXCHANGE_RATE).toLocaleString();
 
-                // Populate receipt items list
                 let recItemsBody = document.getElementById("rec-items-body");
                 recItemsBody.innerHTML = "";
                 data.cart.forEach(cartItem => {
@@ -217,7 +204,6 @@ function checkout() {
                     recItemsBody.appendChild(tr);
                 });
 
-                // Trigger browser print dialog for thermal printing
                 window.print();
 
                 alert(data.message);
@@ -229,10 +215,11 @@ function checkout() {
             });
         }
     </script>
+
+    <!-- Hidden Printable Thermal Receipt Layout -->
     <div id="receipt-section">
         <div class="thermal-receipt">
-            <!-- Future Logo Placeholder (uncomment and adjust path when ready): -->
-            <!-- <img src="{{ url_for('static', filename='uploads/logo.png') }}" class="receipt-logo"> -->
+            <!-- Future Logo Placeholder: <img src="{{ url_for('static', filename='uploads/logo.png') }}" class="receipt-logo"> -->
             
             <div class="receipt-header">POS-101</div>
             <div style="text-align: center; font-size: 12px;">Energy International SARL</div>
