@@ -56,11 +56,12 @@
                 <h2>Items</h2>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
                     {% for item in items %}
-                    <button class="btn" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item.name|tojson }}, {{ item.price }})'>
+                    <!-- Passed item.category_name dynamically into addItem -->
+                    <button class="btn" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|default("General")|tojson }})'>
                         <strong style="text-transform: uppercase; font-size: 1.2rem; margin-bottom: 4px;">{{ item.name }}</strong>
                         <span style="font-size: 1.3rem; font-weight: bold; margin-bottom: 2px;">${{ "%.2f"|format(item.price) }}</span>    
                         <small style="font-size: 0.85em; opacity: 0.8;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
-                        </button>
+                    </button>
                     {% endfor %}
                 </div>
             </div>
@@ -88,7 +89,7 @@
         let cart = [];
         let total = 0;
 
-        function addItem(name, price) {
+        function addItem(name, price, categoryName) {
             let existingItem = cart.find(item => item.name === name);
 
             if (existingItem) {
@@ -98,6 +99,7 @@
                 cart.push({
                     name: name,
                     price: price,
+                    category_name: categoryName || 'General',
                     quantity: 1,
                     line_total: price
                 });
@@ -150,11 +152,11 @@
                 let lineLbp = item.line_total * EXCHANGE_RATE;
 
                 li.innerHTML = `
-                    <div><strong>${item.name}</strong></div>
+                    <div><strong>${item.name}</strong> <small style="color: #666;">(${item.category_name})</small></div>
                     <div>Qty: ${item.quantity} | Unit: $${Number(item.price).toFixed(2)} (${Math.round(unitLbp).toLocaleString()} LBP)</div>
                     <div>Line Total: $${Number(item.line_total).toFixed(2)} (${Math.round(lineLbp).toLocaleString()} LBP)</div>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn" onclick='addItem(${JSON.stringify(item.name)}, ${item.price})'>+</button>
+                        <button class="btn" onclick='addItem(${JSON.stringify(item.name)}, ${item.price}, ${JSON.stringify(item.category_name)})'>+</button>
                         <button class="btn" style="background:#f59e0b;" onclick='decreaseItem(${JSON.stringify(item.name)})'>-</button>
                         <button class="btn" style="background:#dc2626;" onclick='removeItem(${JSON.stringify(item.name)})'>Remove</button>
                     </div>
@@ -186,25 +188,126 @@
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById("rec-sale-id").textContent = data.sale_id;
-                document.getElementById("rec-date").textContent = data.sale_datetime;
-                document.getElementById("rec-cashier").textContent = data.cashier;
-                document.getElementById("rec-total").textContent = data.total.toFixed(2);
-                document.getElementById("rec-total-lbp").textContent = Math.round(data.total * EXCHANGE_RATE).toLocaleString();
-
-                let recItemsBody = document.getElementById("rec-items-body");
-                recItemsBody.innerHTML = "";
+                // Group cart items dynamically by category for separate printing
+                const categoriesMap = {};
                 data.cart.forEach(cartItem => {
-                    let tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td style="text-align: left; border: none; padding: 2px 0;">${cartItem.name}</td>
-                        <td style="text-align: center; border: none; padding: 2px 0;">${cartItem.quantity}</td>
-                        <td style="text-align: right; border: none; padding: 2px 0;">$${cartItem.line_total.toFixed(2)}</td>
-                    `;
-                    recItemsBody.appendChild(tr);
+                    const cat = cartItem.category_name || 'General';
+                    if (!categoriesMap[cat]) {
+                        categoriesMap[cat] = [];
+                    }
+                    categoriesMap[cat].push(cartItem);
                 });
 
-                window.print();
+                // Loop through each category group and trigger an independent receipt print job
+                const categoryKeys = Object.keys(categoriesMap);
+                categoryKeys.forEach((categoryName, index) => {
+                    const catItems = categoriesMap[categoryName];
+                    const catTotal = catItems.reduce((sum, i) => sum + i.line_total, 0);
+                    const catTotalLbp = catTotal * EXCHANGE_RATE;
+
+                    // Dynamically assign Logo A, Logo B, or scalable fallback headers
+                    let logoHeaderHtml = '';
+                    const lowerCat = categoryName.toLowerCase();
+                    if (lowerCat.includes('church')) {
+                        // Logo A representation
+                        logoHeaderHtml = `
+                            <div class="receipt-header">POS-101</div>
+                            <div style="text-align: center; font-size: 18px; font-weight: bold;">[ LOGO A: CHURCH ]</div>
+                            <div style="text-align: center; font-size: 16px;">St. Georges Church Aley</div>
+                        `;
+                    } else if (lowerCat.includes('bar') || lowerCat.includes('kbar')) {
+                        // Logo B representation
+                        logoHeaderHtml = `
+                            <div class="receipt-header">POS-101</div>
+                            <div style="text-align: center; font-size: 18px; font-weight: bold;">[ LOGO B: KBAR ]</div>
+                            <div style="text-align: center; font-size: 16px;">KBar Section</div>
+                        `;
+                    } else {
+                        // Scalable fallback for any future categories added later
+                        logoHeaderHtml = `
+                            <div class="receipt-header">POS-101</div>
+                            <div style="text-align: center; font-size: 18px; font-weight: bold;">[ ${categoryName.toUpperCase()} ]</div>
+                        `;
+                    }
+
+                    // Build table items for this specific category receipt
+                    let itemsRowsHtml = '';
+                    catItems.forEach(cartItem => {
+                        itemsRowsHtml += `
+                            <tr>
+                                <td style="text-align: left; border: none; padding: 2px 0;">${cartItem.name}</td>
+                                <td style="text-align: center; border: none; padding: 2px 0;">${cartItem.quantity}</td>
+                                <td style="text-align: right; border: none; padding: 2px 0;">$${cartItem.line_total.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+
+                    // Construct the isolated receipt frame content
+                    let receiptHTML = `
+                        <html>
+                        <head>
+                            <style>
+                                body { font-family: 'Courier New', monospace; width: 280px; margin: 0; padding: 5px; }
+                                .thermal-receipt { width: 100%; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="thermal-receipt">
+                                ${logoHeaderHtml}
+                                <hr style="border: dashed 1px #000; margin: 5px 0;">
+                                <div>Receipt ID: ${data.sale_id}</div>
+                                <div>Date: ${data.sale_datetime}</div>
+                                <div>Cashier: ${data.cashier}</div>
+                                <div>Category: <strong>${categoryName}</strong></div>
+                                <hr style="border: dashed 1px #000; margin: 5px 0;">
+                                <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid #000;">
+                                            <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
+                                            <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
+                                            <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${itemsRowsHtml}
+                                    </tbody>
+                                </table>
+                                <hr style="border: dashed 1px #000; margin: 5px 0;">
+                                <div style="text-align: right; font-weight: bold; font-size: 18px;">
+                                    Total: $${catTotal.toFixed(2)}
+                                </div>
+                                <div style="text-align: right; font-weight: bold; font-size: 16px;">
+                                    Total LBP: ${Math.round(catTotalLbp).toLocaleString()} LBP
+                                </div>
+                                <hr style="border: dashed 1px #000; margin: 5px 0;">
+                                <div style="text-align: center; font-weight: bold; font-size: 16px;">Thank you for your business!</div>
+                                <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
+                                <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
+                            </div>
+                        </body>
+                        </html>
+                    `;
+
+                    // Create a hidden iframe to execute each print job independently with a slight stagger delay
+                    setTimeout(() => {
+                        const printFrame = document.createElement('iframe');
+                        printFrame.style.position = 'absolute';
+                        printFrame.style.top = '-1000px';
+                        printFrame.style.left = '-1000px';
+                        document.body.appendChild(printFrame);
+
+                        const frameDoc = printFrame.contentWindow.document;
+                        frameDoc.open();
+                        frameDoc.write(receiptHTML);
+                        frameDoc.close();
+
+                        setTimeout(() => {
+                            printFrame.contentWindow.focus();
+                            printFrame.contentWindow.print();
+                            setTimeout(() => { document.body.removeChild(printFrame); }, 1500);
+                        }, 500);
+                    }, index * 1000); // Stagger print prompts by 1 second if multiple categories exist
+                });
 
                 alert(data.message);
                 clearCart();
@@ -216,13 +319,11 @@
         }
     </script>
 
-    <!-- Hidden Printable Thermal Receipt Layout -->
+    <!-- Hidden Static Printable Layout Fallback -->
     <div id="receipt-section">
         <div class="thermal-receipt">
-            <!-- Future Logo Placeholder: <img src="{{ url_for('static', filename='uploads/logo.png') }}" class="receipt-logo"> -->
-            
             <div class="receipt-header">POS-101</div>
-            <div style="text-align: center; font-size: 18px;">St. Geroges Church Aley</div>
+            <div style="text-align: center; font-size: 18px;">St. Georges Church Aley</div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <div>Receipt ID: <span id="rec-sale-id"></span></div>
             <div>Date: <span id="rec-date"></span></div>
@@ -236,9 +337,7 @@
                         <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
                     </tr>
                 </thead>
-                <tbody id="rec-items-body">
-                    <!-- Injected items go here -->
-                </tbody>
+                <tbody id="rec-items-body"></tbody>
             </table>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <div style="text-align: right; font-weight: bold; font-size: 18px;">
@@ -250,11 +349,6 @@
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <div style="text-align: center; font-weight: bold; font-size: 16px;">Thank you for your business!</div>
             <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-
         </div>
     </div>
 </body>
