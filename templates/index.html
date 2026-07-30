@@ -203,7 +203,7 @@
             document.getElementById("total-lbp").textContent = Math.round(total * EXCHANGE_RATE).toLocaleString();
         }
 
-        function checkout() {
+function checkout() {
             if (cart.length === 0) {
                 alert("Cart is empty");
                 return;
@@ -234,14 +234,14 @@
                 data.cart.forEach(cartItem => {
                     let tr = document.createElement("tr");
                     tr.innerHTML = `
-                        <td style="text-align: left;">${cartItem.name}</td>
-                        <td style="text-align: center;">${cartItem.quantity}</td>
-                        <td style="text-align: right;">$${cartItem.line_total.toFixed(2)}</td>
+                        <td style="text-align: left; border: none; padding: 2px 0;">${cartItem.name}</td>
+                        <td style="text-align: center; border: none; padding: 2px 0;">${cartItem.quantity}</td>
+                        <td style="text-align: right; border: none; padding: 2px 0;">$${cartItem.line_total.toFixed(2)}</td>
                     `;
                     recItemsBody.appendChild(tr);
                 });
 
-                // Automatically trigger the printer window dialog using browser settings & default printer
+                // Trigger browser print dialog for thermal printing
                 window.print();
 
                 alert(data.message);
