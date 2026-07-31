@@ -183,6 +183,9 @@
                 return;
             }
 
+            let churchItems = cart.filter(item => !item.category || item.category.toLowerCase() !== "kbar");
+            let kbarItems = cart.filter(item => item.category && item.category.toLowerCase() === "kbar");
+
             fetch("/checkout", {
                 method: "POST",
                 headers: {
@@ -195,36 +198,68 @@
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById("rec-sale-id").textContent = data.sale_id;
-                document.getElementById("rec-date").textContent = data.sale_datetime;
-                document.getElementById("rec-cashier").textContent = data.cashier;
-                document.getElementById("rec-total").textContent = data.total.toFixed(2);
-                document.getElementById("rec-total-lbp").textContent = Math.round(data.total * EXCHANGE_RATE).toLocaleString();
-                let allKbar = cart.every(item => item.category && item.category.toLowerCase() === "kbar"); 
-                
-                let receiptLogo = document.getElementById("rec-logo");
-                if (allKbar) {
-                    receiptLogo.src = "{{ url_for('static', filename='uploads/Kbar_logo.jpg') }}";
-                } else {
-                    receiptLogo.src = "{{ url_for('static', filename='uploads/Church_logo.jpg') }}";
+                let saleId = data.sale_id;
+                let saleDate = data.sale_datetime;
+                let cashier = data.cashier;
+
+                document.getElementById("rec-sale-id").textContent = saleId;
+                document.getElementById("rec-date").textContent = saleDate;
+                document.getElementById("rec-cashier").textContent = cashier;
+
+                // Helper function to render items and print a specific batch
+                function printReceiptBatch(batchItems, logoFilename, headerTitle) {
+                    // Update logo
+                    document.getElementById("rec-logo").src = "{{ url_for('static', filename='uploads/') }}" + logoFilename;
+                    
+                    // Update header title if you want (or keep it constant)
+
+                    let recItemsBody = document.getElementById("rec-items-body");
+                    recItemsBody.innerHTML = "";
+                    
+                    let batchTotal = 0;
+                    batchItems.forEach(cartItem => {
+                        batchTotal += cartItem.line_total;
+                        let tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td style="text-align: left; border: none; padding: 2px 0;">${cartItem.name}</td>
+                            <td style="text-align: center; border: none; padding: 2px 0;">${cartItem.quantity}</td>
+                            <td style="text-align: right; border: none; padding: 2px 0;">$${cartItem.line_total.toFixed(2)}</td>
+                        `;
+                        recItemsBody.appendChild(tr);
+                    });
+
+                    // Update batch totals
+                    document.getElementById("rec-total").textContent = batchTotal.toFixed(2);
+                    document.getElementById("rec-total-lbp").textContent = Math.round(batchTotal * EXCHANGE_RATE).toLocaleString();
+
+                    // Trigger print
+                    window.print();
                 }
 
-                let recItemsBody = document.getElementById("rec-items-body");
-                recItemsBody.innerHTML = "";
-                data.cart.forEach(cartItem => {
-                    let tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td style="text-align: left; border: none; padding: 2px 0;">${cartItem.name}</td>
-                        <td style="text-align: center; border: none; padding: 2px 0;">${cartItem.quantity}</td>
-                        <td style="text-align: right; border: none; padding: 2px 0;">$${cartItem.line_total.toFixed(2)}</td>
-                    `;
-                    recItemsBody.appendChild(tr);
-                });
+                // 3. Printing logic based on what's in the cart
+                if (churchItems.length > 0 && kbarItems.length > 0) {
+                    // Mixed order: Print Church receipt first, then KBar receipt after a small delay
+                    printReceiptBatch(churchItems, "Church_logo.jpg", "St. Georges Church Aley");
+                    
+                    setTimeout(() => {
+                        printReceiptBatch(kbarItems, "Kbar_logo.jpg", "KBar Receipt");
+                        alert(data.message);
+                        clearCart();
+                    }, 1500); // 1.5-second pause between print dialogs so the browser can catch up
 
-                window.print();
+                } else if (kbarItems.length > 0) {
+                    // Only KBar items
+                    printReceiptBatch(kbarItems, "Kbar_logo.jpg", "KBar Receipt");
+                    alert(data.message);
+                    clearCart();
 
-                alert(data.message);
-                clearCart();
+                } else {
+                    // Only Church items (default)
+                    printReceiptBatch(churchItems, "Church_logo.jpg", "St. Georges Church Aley");
+                    alert(data.message);
+                    clearCart();
+                }
+
             })
             .catch(error => {
                 console.error("Checkout error:", error);
