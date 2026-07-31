@@ -47,15 +47,15 @@
             </div>
 
             <div class="summary-box">
-                <h5>Church Sales</h5>
-                <h3>${{ "%.2f"|format(church_total) }}</h3>
-                <small class="text-muted">{{ "{:,.0f}".format(church_total * 90000) }} LBP</small>
+                <h3>Church Sales</h3>
+                <div class="value">${{ "%.2f"|format(church_total) }}</div>
+                <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(church_total * 90000) }} LBP</div>
             </div>
 
             <div class="summary-box">
-                <h5>Kbar Sales</h5>
-                <h3>${{ "%.2f"|format(kbar_total) }}</h3>
-                <small class="text-muted">{{ "{:,.0f}".format(kbar_total * 90000) }} LBP</small>
+                <h3>kbar_total</h3>
+                <div class="value">${{ "%.2f"|format(kbar_total) }}</div>
+                <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(kbar_total * 90000) }} LBP</div>
             </div>
 
             <div class="summary-box">
