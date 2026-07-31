@@ -64,7 +64,7 @@
                             {% set cat_class = "btn-category-kbar" %}
                         {% endif %}
                         
-                        <button class="btn {{ cat_class }}" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item.name|tojson }}, {{ item.price }})'>
+                        <button class="btn {{ cat_class }}" style="padding:12px; display: flex; flex-direction: column; align-items: center; justify-content: center;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|tojson }})'>
                             <strong style="text-transform: uppercase; font-size: 1.2rem; margin-bottom: 4px;">{{ item.name }}</strong>
                             <span style="font-size: 1.3rem; font-weight: bold; margin-bottom: 2px;">${{ "%.2f"|format(item.price) }}</span>    
                             <small style="font-size: 0.85em; opacity: 0.8;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
@@ -96,7 +96,7 @@
         let cart = [];
         let total = 0;
 
-        function addItem(name, price) {
+        function addItem(name, price, category) {
             let existingItem = cart.find(item => item.name === name);
 
             if (existingItem) {
@@ -107,7 +107,8 @@
                     name: name,
                     price: price,
                     quantity: 1,
-                    line_total: price
+                    line_total: price,
+                    category: category
                 });
             }
 
@@ -162,7 +163,7 @@
                     <div>Qty: ${item.quantity} | Unit: $${Number(item.price).toFixed(2)} (${Math.round(unitLbp).toLocaleString()} LBP)</div>
                     <div>Line Total: $${Number(item.line_total).toFixed(2)} (${Math.round(lineLbp).toLocaleString()} LBP)</div>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn" onclick='addItem(${JSON.stringify(item.name)}, ${item.price})'>+</button>
+                        <button class="btn" onclick='addItem(${JSON.stringify(item.name)}, ${item.price}, ${JSON.stringify(item.category)})'>+</button>
                         <button class="btn" style="background:#f59e0b;" onclick='decreaseItem(${JSON.stringify(item.name)})'>-</button>
                         <button class="btn" style="background:#dc2626;" onclick='removeItem(${JSON.stringify(item.name)})'>Remove</button>
                     </div>
