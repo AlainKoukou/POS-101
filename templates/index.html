@@ -281,8 +281,8 @@
     <div id="receipt-section">
         <!-- RECEIPT 1: CHURCH -->
         <div id="church-receipt-block" class="thermal-receipt" style="display: none;">
-            <img id="rec-church-logo" src="{{ url_for('static', filename='uploads/Church_logo.jpg') }}" class="receipt-logo">   
-            <div class="receipt-header">St. Georges Church Aley</div>
+            <img id="rec-church-logo" src="{{ url_for('static', filename='uploads/' + logo_filename) }}" class="receipt-logo">   
+            <div class="receipt-header">{{ receipt_header }}</div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <div>Receipt ID: <span class="rec-sale-id"></span></div>
             <div>Date: <span class="rec-date"></span></div>
@@ -319,8 +319,8 @@
 
         <!-- RECEIPT 2: KBAR -->
         <div id="kbar-receipt-block" class="thermal-receipt" style="display: none;">
-            <img id="rec-kbar-logo" src="{{ url_for('static', filename='uploads/Kbar_logo.jpg') }}" class="receipt-logo">   
-            <div class="receipt-header">St. Georges Church Aley </div>
+            <img id="rec-kbar-logo" src="{{ url_for('static', filename='uploads/' + kbar_logo_filename) }}" class="receipt-logo">   
+            <div class="receipt-header">{{ receipt_header }}</div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <div>Receipt ID: <span class="rec-sale-id"></span></div>
             <div>Date: <span class="rec-date"></span></div>

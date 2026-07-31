@@ -8,11 +8,16 @@ import sqlite3
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
+app.secret_key = os.environ.get("SECRET_KEY", "default_secret_key_here")
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+# Dynamic branding per client/instance deployment
+APP_TITLE = os.environ.get("APP_TITLE", "POS System")
+RECEIPT_HEADER_TEXT = os.environ.get("RECEIPT_HEADER_TEXT", "St. Georges Church Aley")
+LOGO_FILENAME = os.environ.get("LOGO_FILENAME", "Church_logo.jpg")
+KBAR_LOGO_FILENAME = os.environ.get("KBAR_LOGO_FILENAME", "Kbar_logo.jpg")
 
 def get_db_connection():
     database_url = os.environ.get("DATABASE_URL")
@@ -38,7 +43,16 @@ def index():
     items = cursor.fetchall()
     conn.close()
 
-    return render_template("index.html", username=session["username"], role=session["role"], items=items)
+    return render_template(
+        "index.html", 
+        username=session["username"], 
+        role=session["role"], 
+        items=items,
+        app_title=APP_TITLE,
+        receipt_header=RECEIPT_HEADER_TEXT,
+        logo_filename=LOGO_FILENAME,
+        kbar_logo_filename=KBAR_LOGO_FILENAME
+    )
 
 
 @app.route("/login", methods=["GET", "POST"])
