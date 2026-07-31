@@ -415,6 +415,9 @@ def daily_report():
     aggregated_items = cursor.fetchall()
 
     item_summary_by_category = {}
+    church_total =0.0
+    kbar_total = 0.0
+    
     for item in aggregated_items:
         category = item["category_name"]
         if category not in item_summary_by_category:
@@ -423,7 +426,7 @@ def daily_report():
 
         if category == "Church":
             church_total += float(item["total_sales"])
-            
+
         elif category == "Kbar":
             kbar_total += float(item["total_sales"])
 
