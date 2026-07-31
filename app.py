@@ -417,7 +417,7 @@ def daily_report():
     item_summary_by_category = {}
     church_total =0.0
     kbar_total = 0.0
-    
+
     for item in aggregated_items:
         category = item["category_name"]
         if category not in item_summary_by_category:
@@ -429,6 +429,13 @@ def daily_report():
 
         elif category == "Kbar":
             kbar_total += float(item["total_sales"])
+
+    cashier_summary = {}
+    for item in report_items:
+        cashier = item["cashier_name"]
+        if cashier not in cashier_summary:
+            cashier_summary[cashier] = 0.0
+        cashier_summary[cashier] += float(item["line_total"])
 
     cursor.execute("""
         SELECT si.item_name, si.line_total as price, v.void_datetime 
@@ -445,8 +452,12 @@ def daily_report():
         "daily_report.html", 
         report_items=report_items, 
         grand_total=grand_total, 
+        church_total=church_total,
+        kbar_total=kbar_total,
+        cashier_summary=cashier_summary,
         item_summary_by_category=item_summary_by_category,
         voided_items=voided_items,
+        report_date=report_date,
         username=session["username"], 
         role=session["role"]
     )
