@@ -183,6 +183,7 @@
                 return;
             }
 
+            // Separate items by category
             let churchItems = cart.filter(item => !item.category || item.category.toLowerCase() !== "kbar");
             let kbarItems = cart.filter(item => item.category && item.category.toLowerCase() === "kbar");
 
@@ -202,64 +203,71 @@
                 let saleDate = data.sale_datetime;
                 let cashier = data.cashier;
 
-                document.getElementById("rec-sale-id").textContent = saleId;
-                document.getElementById("rec-date").textContent = saleDate;
-                document.getElementById("rec-cashier").textContent = cashier;
+                // Populate shared text fields across all receipt blocks
+                document.querySelectorAll(".rec-sale-id").forEach(el => el.textContent = saleId);
+                document.querySelectorAll(".rec-date").forEach(el => el.textContent = saleDate);
+                document.querySelectorAll(".rec-cashier").forEach(el => el.textContent = cashier);
 
-                // Helper function to render items and print a specific batch
-                function printReceiptBatch(batchItems, logoFilename, headerTitle) {
-                    // Update logo
-                    document.getElementById("rec-logo").src = "{{ url_for('static', filename='uploads/') }}" + logoFilename;
-                    
-                    // Update header title if you want (or keep it constant)
+                let churchBlock = document.getElementById("church-receipt-block");
+                let kbarBlock = document.getElementById("kbar-receipt-block");
+                let pageBreak = document.querySelector(".receipt-page-break");
 
-                    let recItemsBody = document.getElementById("rec-items-body");
-                    recItemsBody.innerHTML = "";
-                    
-                    let batchTotal = 0;
-                    batchItems.forEach(cartItem => {
-                        batchTotal += cartItem.line_total;
-                        let tr = document.createElement("tr");
-                        tr.innerHTML = `
-                            <td style="text-align: left; border: none; padding: 2px 0;">${cartItem.name}</td>
-                            <td style="text-align: center; border: none; padding: 2px 0;">${cartItem.quantity}</td>
-                            <td style="text-align: right; border: none; padding: 2px 0;">$${cartItem.line_total.toFixed(2)}</td>
-                        `;
-                        recItemsBody.appendChild(tr);
+                // Handle Church Receipt Block
+                if (churchItems.length > 0) {
+                    churchBlock.style.display = "block";
+                    let churchBody = document.getElementById("rec-church-items-body");
+                    churchBody.innerHTML = "";
+                    let churchTotal = 0;
+
+                    churchItems.forEach(item => {
+                        churchTotal += item.line_total;
+                        churchBody.innerHTML += `
+                            <tr>
+                                <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
+                                <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
+                                <td style="text-align: right; border: none; padding: 2px 0;">$${item.line_total.toFixed(2)}</td>
+                            </tr>`;
                     });
-
-                    // Update batch totals
-                    document.getElementById("rec-total").textContent = batchTotal.toFixed(2);
-                    document.getElementById("rec-total-lbp").textContent = Math.round(batchTotal * EXCHANGE_RATE).toLocaleString();
-
-                    // Trigger print
-                    window.print();
-                }
-
-                // 3. Printing logic based on what's in the cart
-                if (churchItems.length > 0 && kbarItems.length > 0) {
-                    // Mixed order: Print Church receipt first, then KBar receipt after a small delay
-                    printReceiptBatch(churchItems, "Church_logo.jpg", "St. Georges Church Aley");
-                    
-                    setTimeout(() => {
-                        printReceiptBatch(kbarItems, "Kbar_logo.jpg", "KBar Receipt");
-                        alert(data.message);
-                        clearCart();
-                    }, 1500); // 1.5-second pause between print dialogs so the browser can catch up
-
-                } else if (kbarItems.length > 0) {
-                    // Only KBar items
-                    printReceiptBatch(kbarItems, "Kbar_logo.jpg", "KBar Receipt");
-                    alert(data.message);
-                    clearCart();
-
+                    document.getElementById("rec-church-total").textContent = churchTotal.toFixed(2);
+                    document.getElementById("rec-church-total-lbp").textContent = Math.round(churchTotal * EXCHANGE_RATE).toLocaleString();
                 } else {
-                    // Only Church items (default)
-                    printReceiptBatch(churchItems, "Church_logo.jpg", "St. Georges Church Aley");
-                    alert(data.message);
-                    clearCart();
+                    churchBlock.style.display = "none";
                 }
 
+                // Handle KBar Receipt Block
+                if (kbarItems.length > 0) {
+                    kbarBlock.style.display = "block";
+                    let kbarBody = document.getElementById("rec-kbar-items-body");
+                    kbarBody.innerHTML = "";
+                    let kbarTotal = 0;
+
+                    kbarItems.forEach(item => {
+                        kbarTotal += item.line_total;
+                        kbarBody.innerHTML += `
+                            <tr>
+                                <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
+                                <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
+                                <td style="text-align: right; border: none; padding: 2px 0;">$${item.line_total.toFixed(2)}</td>
+                            </tr>`;
+                    });
+                    document.getElementById("rec-kbar-total").textContent = kbarTotal.toFixed(2);
+                    document.getElementById("rec-kbar-total-lbp").textContent = Math.round(kbarTotal * EXCHANGE_RATE).toLocaleString();
+                } else {
+                    kbarBlock.style.display = "none";
+                }
+
+                // Manage page break visibility if only one of them is showing
+                if (churchItems.length > 0 && kbarItems.length > 0) {
+                    pageBreak.style.display = "block";
+                } else {
+                    pageBreak.style.display = "none";
+                }
+
+                // Trigger ONE single clean print dialog for both receipts stacked together
+                window.print();
+
+                alert(data.message);
+                clearCart();
             })
             .catch(error => {
                 console.error("Checkout error:", error);
@@ -269,15 +277,16 @@
     </script>
 
     <!-- Hidden Printable Thermal Receipt Layout -->
+    <!-- Hidden Printable Thermal Receipt Layout -->
     <div id="receipt-section">
-        <div class="thermal-receipt">
-            <img id="rec-logo" src="{{ url_for('static', filename='uploads/Church_logo.jpg') }}" class="receipt-logo">   
-            
-            <div class="receipt-header">St. Geroges Church Aley</div>
+        <!-- RECEIPT 1: CHURCH -->
+        <div id="church-receipt-block" class="thermal-receipt" style="display: none;">
+            <img id="rec-church-logo" src="{{ url_for('static', filename='uploads/Church_logo.jpg') }}" class="receipt-logo">   
+            <div class="receipt-header">St. Georges Church Aley</div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div>Receipt ID: <span id="rec-sale-id"></span></div>
-            <div>Date: <span id="rec-date"></span></div>
-            <div>Cashier: <span id="rec-cashier"></span></div>
+            <div>Receipt ID: <span class="rec-sale-id"></span></div>
+            <div>Date: <span class="rec-date"></span></div>
+            <div>Cashier: <span class="rec-cashier"></span></div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
                 <thead>
@@ -287,25 +296,52 @@
                         <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
                     </tr>
                 </thead>
-                <tbody id="rec-items-body">
-                    <!-- Injected items go here -->
-                </tbody>
+                <tbody id="rec-church-items-body"></tbody>
             </table>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
             <div style="text-align: right; font-weight: bold; font-size: 18px;">
-                Total: $<span id="rec-total"></span>
+                Total: $<span id="rec-church-total"></span>
             </div>
             <div style="text-align: right; font-weight: bold; font-size: 16px;">
-                Total LBP: <span id="rec-total-lbp"></span> LBP
+                Total LBP: <span id="rec-church-total-lbp"></span> LBP
             </div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: center; font-weight: bold; font-size: 16px;">Eid Salib Moubarak ! </div>
+            <div style="text-align: center; font-weight: bold; font-size: 16px;">Eid Salib Moubarak !</div>
             <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
-            <div style="text-align: center; font-size: 16px; margin-top: 4px;">................</div>
+        </div>
 
+        <!-- PAGE BREAK FOR THERMAL PRINTER BETWEEN RECEIPTS -->
+        <div class="receipt-page-break"></div>
+
+        <!-- RECEIPT 2: KBAR -->
+        <div id="kbar-receipt-block" class="thermal-receipt" style="display: none;">
+            <img id="rec-kbar-logo" src="{{ url_for('static', filename='uploads/Kbar_logo.jpg') }}" class="receipt-logo">   
+            <div class="receipt-header">KBar Receipt</div>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <div>Receipt ID: <span class="rec-sale-id"></span></div>
+            <div>Date: <span class="rec-date"></span></div>
+            <div>Cashier: <span class="rec-cashier"></span></div>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #000;">
+                        <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
+                        <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
+                        <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
+                    </tr>
+                </thead>
+                <tbody id="rec-kbar-items-body"></tbody>
+            </table>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <div style="text-align: right; font-weight: bold; font-size: 18px;">
+                Total: $<span id="rec-kbar-total"></span>
+            </div>
+            <div style="text-align: right; font-weight: bold; font-size: 16px;">
+                Total LBP: <span id="rec-kbar-total-lbp"></span> LBP
+            </div>
+            <hr style="border: dashed 1px #000; margin: 5px 0;">
+            <div style="text-align: center; font-weight: bold; font-size: 16px;">Thank You!</div>
+            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
         </div>
     </div>
 </body>

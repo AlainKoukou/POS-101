@@ -281,6 +281,11 @@ a:hover {
         filter: grayscale(100%) contrast(1000%) brightness(90%);
         image-rendering: pixelated;
     }
+    .receipt-page-break {
+        page-break-after: always;
+        break-after: page;
+        height: 20px; /* Adds a clean physical gap on paper if continuous roll */
+    }
 
     }
 
