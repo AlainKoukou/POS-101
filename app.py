@@ -34,7 +34,7 @@ def index():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name, price FROM items ORDER BY name ASC")
+    cursor.execute("SELECT name, category_name, price FROM items ORDER BY category_name ASC, name ASC")
     items = cursor.fetchall()
     conn.close()
 

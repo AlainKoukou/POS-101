@@ -260,4 +260,21 @@ a:hover {
         display: block;
         margin: 0 auto 5px auto;
     }
-}
+        /* Category-based button colors */
+    .btn-category-default {
+        background: #1f6feb; 
+        color: white;
+    }
+    .btn-category-default:hover {
+        background: #1557b0;
+    }
+
+    .btn-category-kbar {
+        background: #10b981; 
+        color: white;
+    }
+    .btn-category-kbar:hover {
+        background: #059669;
+    }
+
+    }
