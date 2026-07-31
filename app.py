@@ -457,7 +457,6 @@ def daily_report():
         cashier_summary=cashier_summary,
         item_summary_by_category=item_summary_by_category,
         voided_items=voided_items,
-        report_date=report_date,
         username=session["username"], 
         role=session["role"]
     )
