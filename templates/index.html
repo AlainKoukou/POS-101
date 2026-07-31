@@ -199,6 +199,14 @@
                 document.getElementById("rec-cashier").textContent = data.cashier;
                 document.getElementById("rec-total").textContent = data.total.toFixed(2);
                 document.getElementById("rec-total-lbp").textContent = Math.round(data.total * EXCHANGE_RATE).toLocaleString();
+                let allKbar = cart.every(item => item.category === "KBar"); 
+                
+                let receiptLogo = document.getElementById("rec-logo");
+                if (allKbar) {
+                    receiptLogo.src = "{{ url_for('static', filename='uploads/Kbar_logo.jpg') }}";
+                } else {
+                    receiptLogo.src = "{{ url_for('static', filename='uploads/Church_logo.jpg') }}";
+                }
 
                 let recItemsBody = document.getElementById("rec-items-body");
                 recItemsBody.innerHTML = "";
@@ -227,7 +235,7 @@
     <!-- Hidden Printable Thermal Receipt Layout -->
     <div id="receipt-section">
         <div class="thermal-receipt">
-            <img src="{{ url_for('static', filename='uploads/Church_logo.jpg') }}" class="receipt-logo">   
+            <img id="rec-logo" src="{{ url_for('static', filename='uploads/Church_logo.jpg') }}" class="receipt-logo">   
             
             <div class="receipt-header">St. Geroges Church Aley</div>
             <hr style="border: dashed 1px #000; margin: 5px 0;">
