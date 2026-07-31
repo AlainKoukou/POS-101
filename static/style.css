@@ -278,7 +278,7 @@ a:hover {
         height: auto;
         display: block;
         margin: 0 auto 5px auto;
-        filter: grayscale(100%) contrast(300%) brightness(90%);
+        filter: grayscale(100%) contrast(1000%) brightness(90%);
         image-rendering: pixelated;
     }
 
