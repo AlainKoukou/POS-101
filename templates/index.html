@@ -200,7 +200,7 @@
                 document.getElementById("rec-cashier").textContent = data.cashier;
                 document.getElementById("rec-total").textContent = data.total.toFixed(2);
                 document.getElementById("rec-total-lbp").textContent = Math.round(data.total * EXCHANGE_RATE).toLocaleString();
-                let allKbar = cart.every(item => item.category === "KBar"); 
+                let allKbar = cart.every(item => item.category && item.category.toLowerCase() === "kbar"); 
                 
                 let receiptLogo = document.getElementById("rec-logo");
                 if (allKbar) {
