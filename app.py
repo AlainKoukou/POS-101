@@ -385,10 +385,13 @@ def daily_report():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT si.sale_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
+        SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
     """)
     report_items = cursor.fetchall()
     
@@ -404,6 +407,9 @@ def daily_report():
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
         GROUP BY COALESCE(i.category_name, 'Uncategorized'), si.item_name
     """)
     aggregated_items = cursor.fetchall()
