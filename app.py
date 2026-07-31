@@ -421,6 +421,12 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
+        if category == "Church":
+            church_total += float(item["total_sales"])
+            
+        elif category == "Kbar":
+            kbar_total += float(item["total_sales"])
+
     cursor.execute("""
         SELECT si.item_name, si.line_total as price, v.void_datetime 
         FROM void_items v
