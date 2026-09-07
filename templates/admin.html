@@ -91,11 +91,19 @@
 
             <table>
                 <tr>
+                    <th>Logo</th>
                     <th>Category Name</th>
                     <th>Delete</th>
                 </tr>
                 {% for category in categories %}
                 <tr>
+                    <td>
+                        {% if category.logo %}
+                            <img src="{{ url_for('static', filename='uploads/' + category.logo) }}" alt="{{ category.name }}" style="width: 40px; height: 40px; object-fit: contain;">
+                        {% else %}
+                            <span class="muted">No Logo</span>
+                        {% endif %}
+                    </td>
                     <td>{{ category.name }}</td>
                     <td>
                         <form action="/delete_category" method="POST">
@@ -110,10 +118,15 @@
             <br>
 
             <h3>Add Category</h3>
-            <form action="/add_category" method="POST" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+            <form action="/add_category" method="POST" enctype="multipart/form-data" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Category Name</label>
                     <input type="text" name="name" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category Logo</label>
+                    <input type="file" name="logo" accept="image/*">
                 </div>
 
                 <button type="submit" class="btn">Add Category</button>

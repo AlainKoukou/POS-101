@@ -27,6 +27,10 @@
                 margin: 0;
                 padding: 0;
             }
+            .receipt-page-break {
+                page-break-after: always;
+                break-after: page;
+            }
         }
     </style>
 </head>
@@ -56,10 +60,8 @@
                 <h2>Items</h2>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
                     {% for item in items %}
-                        {# Normalize category name to lowercase & trim whitespace #}
                         {% set cat = item.category_name | default('', true) | lower | trim %}
                         {% set cat_class = "btn-category-default" %}
-                        
                         {% if cat == "kbar" %}
                             {% set cat_class = "btn-category-kbar" %}
                         {% endif %}
@@ -96,6 +98,13 @@
         let cart = [];
         let total = 0;
 
+        // Map categories to their uploaded logos from backend database
+        const categoryLogos = {
+            {% for cat in categories %}
+            {{ cat.name | tojson }}: {{ (cat.logo if cat.logo else '') | tojson }},
+            {% endfor %}
+        };
+
         function addItem(name, price, category) {
             let existingItem = cart.find(item => item.name === name);
 
@@ -108,7 +117,7 @@
                     price: price,
                     quantity: 1,
                     line_total: price,
-                    category: category
+                    category: category || "General"
                 });
             }
 
@@ -117,11 +126,9 @@
 
         function decreaseItem(name) {
             let existingItem = cart.find(item => item.name === name);
-
             if (!existingItem) return;
 
             existingItem.quantity -= 1;
-
             if (existingItem.quantity <= 0) {
                 cart = cart.filter(item => item.name !== name);
             } else {
@@ -159,7 +166,7 @@
                 let lineLbp = item.line_total * EXCHANGE_RATE;
 
                 li.innerHTML = `
-                    <div><strong>${item.name}</strong></div>
+                    <div><strong>${item.name}</strong> <small style="color:#666;">(${item.category})</small></div>
                     <div>Qty: ${item.quantity} | Unit: $${Number(item.price).toFixed(2)} (${Math.round(unitLbp).toLocaleString()} LBP)</div>
                     <div>Line Total: $${Number(item.line_total).toFixed(2)} (${Math.round(lineLbp).toLocaleString()} LBP)</div>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
@@ -183,10 +190,6 @@
                 return;
             }
 
-            // Separate items by category
-            let churchItems = cart.filter(item => !item.category || item.category.toLowerCase() !== "kbar");
-            let kbarItems = cart.filter(item => item.category && item.category.toLowerCase() === "kbar");
-
             fetch("/checkout", {
                 method: "POST",
                 headers: {
@@ -203,67 +206,85 @@
                 let saleDate = data.sale_datetime;
                 let cashier = data.cashier;
 
-                // Populate shared text fields across all receipt blocks
-                document.querySelectorAll(".rec-sale-id").forEach(el => el.textContent = saleId);
-                document.querySelectorAll(".rec-date").forEach(el => el.textContent = saleDate);
-                document.querySelectorAll(".rec-cashier").forEach(el => el.textContent = cashier);
+                // Group cart items dynamically by category
+                let groupedByCategory = {};
+                cart.forEach(item => {
+                    let cat = item.category || "General";
+                    if (!groupedByCategory[cat]) {
+                        groupedByCategory[cat] = [];
+                    }
+                    groupedByCategory[cat].push(item);
+                });
 
-                let churchBlock = document.getElementById("church-receipt-block");
-                let kbarBlock = document.getElementById("kbar-receipt-block");
-                let pageBreak = document.querySelector(".receipt-page-break");
+                let receiptSection = document.getElementById("receipt-section");
+                receiptSection.innerHTML = ""; // Clear previous receipts
 
-                // Handle Church Receipt Block
-                if (churchItems.length > 0) {
-                    churchBlock.style.display = "block";
-                    let churchBody = document.getElementById("rec-church-items-body");
-                    churchBody.innerHTML = "";
-                    let churchTotal = 0;
+                let categories = Object.keys(groupedByCategory);
 
-                    churchItems.forEach(item => {
-                        churchTotal += item.line_total;
-                        churchBody.innerHTML += `
+                categories.forEach((catName, index) => {
+                    let catItems = groupedByCategory[catName];
+                    let catTotal = catItems.reduce((sum, item) => sum + item.line_total, 0);
+                    let catTotalLbp = Math.round(catTotal * EXCHANGE_RATE);
+                    let logoFilename = categoryLogos[catName];
+
+                    // Build receipt block for this specific category
+                    let receiptDiv = document.createElement("div");
+                    receiptDiv.className = "thermal-receipt";
+                    
+                    let logoHtml = logoFilename ? `<img src="/static/uploads/${logoFilename}" class="receipt-logo">` : '';
+
+                    let itemsHtml = "";
+                    catItems.forEach(item => {
+                        itemsHtml += `
                             <tr>
                                 <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
                                 <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
                                 <td style="text-align: right; border: none; padding: 2px 0;">$${item.line_total.toFixed(2)}</td>
                             </tr>`;
                     });
-                    document.getElementById("rec-church-total").textContent = churchTotal.toFixed(2);
-                    document.getElementById("rec-church-total-lbp").textContent = Math.round(churchTotal * EXCHANGE_RATE).toLocaleString();
-                } else {
-                    churchBlock.style.display = "none";
-                }
 
-                // Handle KBar Receipt Block
-                if (kbarItems.length > 0) {
-                    kbarBlock.style.display = "block";
-                    let kbarBody = document.getElementById("rec-kbar-items-body");
-                    kbarBody.innerHTML = "";
-                    let kbarTotal = 0;
+                    receiptDiv.innerHTML = `
+                        ${logoHtml}
+                        <div class="receipt-header">St. Georges Church Aley</div>
+                        <div style="text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 4px;">Station: ${catName}</div>
+                        <hr style="border: dashed 1px #000; margin: 5px 0;">
+                        <div>Receipt ID: ${saleId}</div>
+                        <div>Date: ${saleDate}</div>
+                        <div>Cashier: ${cashier}</div>
+                        <hr style="border: dashed 1px #000; margin: 5px 0;">
+                        <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid #000;">
+                                    <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
+                                    <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
+                                    <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemsHtml}</tbody>
+                        </table>
+                        <hr style="border: dashed 1px #000; margin: 5px 0;">
+                        <div style="text-align: right; font-weight: bold; font-size: 18px;">
+                            Total: $${catTotal.toFixed(2)}
+                        </div>
+                        <div style="text-align: right; font-weight: bold; font-size: 16px;">
+                            Total LBP: ${catTotalLbp.toLocaleString()} LBP
+                        </div>
+                        <hr style="border: dashed 1px #000; margin: 5px 0;">
+                        <div style="text-align: center; font-weight: bold; font-size: 16px;">Thank You!</div>
+                        <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
+                    `;
 
-                    kbarItems.forEach(item => {
-                        kbarTotal += item.line_total;
-                        kbarBody.innerHTML += `
-                            <tr>
-                                <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
-                                <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
-                                <td style="text-align: right; border: none; padding: 2px 0;">$${item.line_total.toFixed(2)}</td>
-                            </tr>`;
-                    });
-                    document.getElementById("rec-kbar-total").textContent = kbarTotal.toFixed(2);
-                    document.getElementById("rec-kbar-total-lbp").textContent = Math.round(kbarTotal * EXCHANGE_RATE).toLocaleString();
-                } else {
-                    kbarBlock.style.display = "none";
-                }
+                    receiptSection.appendChild(receiptDiv);
 
-                // Manage page break visibility if only one of them is showing
-                if (churchItems.length > 0 && kbarItems.length > 0) {
-                    pageBreak.style.display = "block";
-                } else {
-                    pageBreak.style.display = "none";
-                }
+                    // Add page break between different category receipts if there are more following
+                    if (index < categories.length - 1) {
+                        let breakDiv = document.createElement("div");
+                        breakDiv.className = "receipt-page-break";
+                        receiptSection.appendChild(breakDiv);
+                    }
+                });
 
-                // Trigger ONE single clean print dialog for both receipts stacked together
+                // Trigger print dialog
                 window.print();
 
                 alert(data.message);
@@ -276,79 +297,8 @@
         }
     </script>
 
-    <!-- Hidden Printable Thermal Receipt Layout -->
-    <div id="receipt-section">
-        <!-- RECEIPT 1: CHURCH -->
-        <div id="church-receipt-block" class="thermal-receipt" style="display: none;">
-            <img src="{{ url_for('static', filename='uploads/Church_logo.jpg') }}" class="receipt-logo">   
-            <div class="receipt-header">St. Georges Church Aley</div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div>Receipt ID: <span class="rec-sale-id"></span></div>
-            <div>Date: <span class="rec-date"></span></div>
-            <div>Cashier: <span class="rec-cashier"></span></div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 1px solid #000;">
-                        <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
-                        <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
-                        <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
-                    </tr>
-                </thead>
-                <tbody id="rec-church-items-body"></tbody>
-            </table>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: right; font-weight: bold; font-size: 18px;">
-                Total: $<span id="rec-church-total"></span>
-            </div>
-            <div style="text-align: right; font-weight: bold; font-size: 16px;">
-                Total LBP: <span id="rec-church-total-lbp"></span> LBP
-            </div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: center; font-weight: bold; font-size: 16px;">Eid Salib Moubarak !</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">............</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">............</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">............</div>
-        </div>
-
-        <!-- PAGE BREAK FOR THERMAL PRINTER BETWEEN RECEIPTS -->
-        <div class="receipt-page-break"></div>
-
-        <!-- RECEIPT 2: KBAR -->
-        <div id="kbar-receipt-block" class="thermal-receipt" style="display: none;">
-            <img src="{{ url_for('static', filename='uploads/Kbar_logo.jpg') }}" class="receipt-logo">   
-            <div class="receipt-header">St. Georges Church Aley</div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div>Receipt ID: <span class="rec-sale-id"></span></div>
-            <div>Date: <span class="rec-date"></span></div>
-            <div>Cashier: <span class="rec-cashier"></span></div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 1px solid #000;">
-                        <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
-                        <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
-                        <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
-                    </tr>
-                </thead>
-                <tbody id="rec-kbar-items-body"></tbody>
-            </table>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: right; font-weight: bold; font-size: 18px;">
-                Total: $<span id="rec-kbar-total"></span>
-            </div>
-            <div style="text-align: right; font-weight: bold; font-size: 16px;">
-                Total LBP: <span id="rec-kbar-total-lbp"></span> LBP
-            </div>
-            <hr style="border: dashed 1px #000; margin: 5px 0;">
-            <div style="text-align: center; font-weight: bold; font-size: 16px;">Cheers !</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">Developed by Alain Koukou</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">............</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">............</div>
-            <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 4px;">............</div>
-        </div>
-    </div>
+    <!-- Dynamic Printable Thermal Receipt Container -->
+    <div id="receipt-section"></div>
 </body>
 
 </html>
