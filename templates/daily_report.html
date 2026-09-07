@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>Daily Report</title>
+    <title>Daily Sales Report</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
@@ -20,91 +20,108 @@
 
     <div class="container">
 
-        <div class="card">
-            <div class="report-header">
-                <div class="report-title">
-                    <h1>Daily Sales Report</h1>
-                    <p class="muted">Report Date: <strong>{{ report_date }}</strong></p>
-                </div>
-
-                <div class="actions-row">
-                    <form action="/download_report">
-                        <button type="submit" class="btn">Download PDF</button>
-                    </form>
-
-                    <form action="/reset_today" method="POST">
-                        <button type="submit" class="danger-btn">Reset Today Report</button>
-                    </form>
-                </div>
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div>
+                <h1>Daily Sales Report</h1>
+                <p>Detailed summary of today's transactions.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="/download_report" class="btn" style="background-color: #28a745; color: white; text-decoration: none; padding: 10px 15px; border-radius: 4px; display:inline-block;">Download PDF</a>
+                <form action="/reset_today" method="POST" onsubmit="return confirm('Are you sure you want to reset all of today sales? This cannot be undone.');" style="margin: 0;">
+                    <button type="submit" class="btn" style="background-color: #dc3545; color: white;">Reset Today Report</button>
+                </form>
             </div>
         </div>
 
-        <div class="summary-grid">
-            <div class="summary-box">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+            <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Grand Total</h3>
-                <div class="value">${{ "%.2f"|format(grand_total) }}</div>
-                <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(grand_total * 90000) }} LBP</div>
+                <h2 style="color: #007bff; margin: 5px 0;">${{ "%.2f"|format(grand_total) }}</h2>
+                <small style="color: gray;">{{ "%.0f"|format(grand_total * 90000) }} LBP</small>
             </div>
 
-            <div class="summary-box">
+            <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Church Sales</h3>
-                <div class="value">${{ "%.2f"|format(church_total) }}</div>
-                <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(church_total * 90000) }} LBP</div>
+                <h2 style="color: #28a745; margin: 5px 0;">${{ "%.2f"|format(church_total) }}</h2>
+                <small style="color: gray;">{{ "%.0f"|format(church_total * 90000) }} LBP</small>
             </div>
 
-            <div class="summary-box">
+            <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Kbar Sales</h3>
-                <div class="value">${{ "%.2f"|format(kbar_total) }}</div>
-                <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(kbar_total * 90000) }} LBP</div>
+                <h2 style="color: #ffc107; margin: 5px 0;">${{ "%.2f"|format(kbar_total) }}</h2>
+                <small style="color: gray;">{{ "%.0f"|format(kbar_total * 90000) }} LBP</small>
             </div>
 
-            <div class="summary-box">
+            <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Voided Entries</h3>
-                <div class="value">{{ voided_items|length }}</div>
+                <h2 style="color: #dc3545; margin: 5px 0;">{{ voided_items|length }}</h2>
             </div>
         </div>
 
+        <!-- Detailed Breakdown by Category -->
         <div class="card">
-            <h2>Categories</h2>
+            <h2>Sales Breakdown by Category</h2>
+            {% if item_summary_by_category %}
+                {% for category_name, items in item_summary_by_category.items() %}
+                    <h3 style="margin-top: 20px; border-bottom: 2px solid #ddd; padding-bottom: 5px; color: #333;">Category: {{ category_name }}</h3>
+                    <table>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Quantity Sold</th>
+                            <th>Total Sales</th>
+                        </tr>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.item_name }}</td>
+                            <td>{{ item.total_qty }}</td>
+                            <td>
+                                ${{ "%.2f"|format(item.total_sales) }} 
+                                <br><small style="color: gray;">({{ "%.0f"|format(item.total_sales * 90000) }} LBP)</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                {% endfor %}
+            {% else %}
+                <p>No sales recorded today.</p>
+            {% endif %}
+        </div>
 
+        <!-- All Individual Transactions -->
+        <div class="card">
+            <h2>All Transactions Today</h2>
             <table>
                 <tr>
-                    <th>Logo</th>
-                    <th>Category Name</th>
-                    <th>Church Report</th>
-                    <th>Delete</th>
+                    <th>Sale ID</th>
+                    <th>Time</th>
+                    <th>Cashier</th>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th>Qty</th>
+                    <th>Line Total</th>
                 </tr>
-                {% for category in categories %}
+                {% for item in report_items %}
                 <tr>
+                    <td>#{{ item.sale_id }}</td>
+                    <td>{{ item.sale_datetime }}</td>
+                    <td>{{ item.cashier_name }}</td>
+                    <td>{{ item.item_name }}</td>
+                    <td>{{ item.category_name or 'Uncategorized' }}</td>
+                    <td>{{ item.quantity }}</td>
                     <td>
-                        {% if category.logo %}
-                            <img src="{{ url_for('static', filename='uploads/' + category.logo) }}" alt="{{ category.name }}" style="width: 40px; height: 40px; object-fit: contain;">
-                        {% else %}
-                            <span class="muted">No Logo</span>
-                        {% endif %}
+                        ${{ "%.2f"|format(item.line_total) }}
+                        <br><small style="color: gray;">({{ "%.0f"|format(item.line_total * 90000) }} LBP)</small>
                     </td>
-                    <td>{{ category.name }}</td>
-                    <td>
-                        {% if category.is_church_report %}
-                            <span style="color: green; font-weight: bold;">Yes</span>
-                        {% else %}
-                            <span style="color: gray;">No</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <form action="/delete_category" method="POST">
-                            <input type="hidden" name="name" value="{{ category.name }}">
-                            <button type="submit" class="btn">Delete</button>
-                        </form>
-                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">No transactions recorded today.</td>
                 </tr>
                 {% endfor %}
             </table>
+        </div>
 
-            <br>
-
-        
-
+        <!-- Voided Items List -->
         <div class="card">
             <h2>Voided Items</h2>
             <table>
@@ -113,16 +130,15 @@
                     <th>Price</th>
                     <th>Void Time</th>
                 </tr>
-                {% for item in voided_items %}
+                {% for void in voided_items %}
                 <tr>
-                    <!-- Fixed: Changed item.name to item.item_name to match backend query -->
-                    <td>{{ item.item_name }}</td>
-                    <td>${{ "%.2f"|format(item.price) }}</td>
-                    <td>{{ item.void_datetime }}</td>
+                    <td>{{ void.item_name }}</td>
+                    <td>${{ "%.2f"|format(void.price) }}</td>
+                    <td>{{ void.void_datetime }}</td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="3" class="muted">No items voided today.</td>
+                    <td colspan="3">No items voided today.</td>
                 </tr>
                 {% endfor %}
             </table>
