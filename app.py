@@ -35,13 +35,18 @@ def index():
     cursor = conn.cursor()
     cursor.execute("SELECT name, category_name, price FROM items ORDER BY category_name ASC, name ASC")
     items = cursor.fetchall()
+    
+    # Fetch categories including their logo filename for dynamic receipt rendering
+    cursor.execute("SELECT name, logo FROM categories")
+    categories = cursor.fetchall()
     conn.close()
 
     return render_template(
         "index.html", 
         username=session["username"], 
         role=session["role"], 
-        items=items
+        items=items,
+        categories=categories
     )
 
 
@@ -136,7 +141,13 @@ def update_price():
                     (converted_price, item_name)
             )
     except ValueError:
-        pass  # Ignored if an invalid number format was accidentally sent
+        try:
+            # Code handling the price update conversion
+            price = float(request.form['price'])
+        except ValueError:
+            flash('Invalid price format entered. Please provide a valid number.', 'danger')
+            return redirect(url_for('admin'))
+
 
 
     conn.commit()
@@ -415,7 +426,7 @@ def daily_report():
     aggregated_items = cursor.fetchall()
 
     item_summary_by_category = {}
-    church_total =0.0
+    church_total = 0.0
     kbar_total = 0.0
 
     for item in aggregated_items:
@@ -559,16 +570,27 @@ def add_category():
         return redirect("/login")
 
     category_name = request.form.get("name")
-
     if not category_name:
         return redirect("/admin")
+
+    logo_filename = None
+    file = request.files.get("logo")
+
+    if file and file.filename != "":
+        logo_filename = secure_filename(file.filename)
+        upload_folder = app.config["UPLOAD_FOLDER"]
+        os.makedirs(upload_folder, exist_ok=True)
+        file.save(os.path.join(upload_folder, logo_filename))
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO categories (name) VALUES (%s)",
-            (category_name,)
+            """
+            INSERT INTO categories (name, logo) VALUES (%s, %s)
+            ON CONFLICT (name) DO UPDATE SET logo = EXCLUDED.logo
+            """,
+            (category_name, logo_filename)
         )
         conn.commit()
         cursor.close()
