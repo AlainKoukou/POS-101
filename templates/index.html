@@ -65,12 +65,21 @@
 
             <div class="card" style="flex:2; min-width:320px;">
                 <h2>Items</h2>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:16px;">
                     {% for item in items %}
-                        <button class="btn" style="background-color: {{ item.category_color }}; color: white; padding:10px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|tojson }})'>
-                            <strong style="text-transform: uppercase; font-size: 1rem; margin-bottom: 4px; word-break: break-word; overflow-wrap: break-word; width: 100%; text-align: center;">{{ item.name }}</strong>
-                            <span style="font-size: 1.2rem; font-weight: bold; margin-bottom: 2px;">${{ "%.2f"|format(item.price) }}</span>    
-                            <small style="font-size: 0.8em; opacity: 0.9;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
+                        {% set cat = item.category_name | default('General', true) | string %}
+                        
+                        {# Compute deterministic HSL color using inline Jinja math #}
+                        {% set ns = namespace(hash=0) %}
+                        {% for char in cat %}
+                            {% set ns.hash = (ns.hash * 31 + char|ord) %}
+                        {% endfor %}
+                        {% set hue = (ns.hash | abs) % 360 %}
+                        
+                        <button style="background-color: hsl({{ hue }}, 65%, 45%) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 20px !important; cursor: pointer !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; min-width: 180px !important; min-height: 200px !important; box-sizing: border-box !important; overflow: hidden !important;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|tojson }})'>
+                            <strong style="font-size: 24px !important; text-transform: uppercase !important; font-weight: bold !important; margin-bottom: 4px !important; word-break: break-word !important; text-align: center !important;">{{ item.name }}</strong>
+                            <span style="font-size: 1.2rem !important; font-weight: bold !important; margin-bottom: 2px !important;">${{ "%.2f"|format(item.price) }}</span>    
+                            <small style="font-size: 0.8em !important; opacity: 0.9 !important;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
                         </button>
                     {% endfor %}
                 </div>
@@ -86,7 +95,7 @@
                 </div>
 
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 15px;">
-                    <button class="btn" onclick="checkout()">Checkout</button>
+                    <button class="btn" style="background: #1f6feb;" onclick="checkout()">Checkout</button>
                     <button class="btn" style="background:#6b7280;" onclick="clearCart()">Clear Cart</button>
                 </div>
             </div>
@@ -99,10 +108,10 @@
         let cart = [];
         let total = 0;
 
-        // Map categories to their uploaded logos from backend database
+        // Map categories to their uploaded logos from backend database (stored in lowercase for safe lookup)
         const categoryLogos = {
             {% for cat in categories %}
-            {{ cat.name | tojson }}: {{ (cat.logo if cat.logo else '') | tojson }},
+            {{ (cat.name | trim | lower) | tojson }}: {{ (cat.logo if cat.logo else '') | tojson }},
             {% endfor %}
         };
 
@@ -171,7 +180,7 @@
                     <div>Qty: ${item.quantity} | Unit: $${Number(item.price).toFixed(2)} (${Math.round(unitLbp).toLocaleString()} LBP)</div>
                     <div>Line Total: $${Number(item.line_total).toFixed(2)} (${Math.round(lineLbp).toLocaleString()} LBP)</div>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn" onclick='addItem(${JSON.stringify(item.name)}, ${item.price}, ${JSON.stringify(item.category)})'>+</button>
+                        <button class="btn" style="background: #1f6feb;" onclick='addItem(${JSON.stringify(item.name)}, ${item.price}, ${JSON.stringify(item.category)})'>+</button>
                         <button class="btn" style="background:#f59e0b;" onclick='decreaseItem(${JSON.stringify(item.name)})'>-</button>
                         <button class="btn" style="background:#dc2626;" onclick='removeItem(${JSON.stringify(item.name)})'>Remove</button>
                     </div>
@@ -226,7 +235,10 @@
                     let catItems = groupedByCategory[catName];
                     let catTotal = catItems.reduce((sum, item) => sum + item.line_total, 0);
                     let catTotalLbp = Math.round(catTotal * EXCHANGE_RATE);
-                    let logoFilename = categoryLogos[catName];
+                    
+                    // Robust case-insensitive and trimmed lookup for the logo
+                    let lookupKey = catName.trim().toLowerCase();
+                    let logoFilename = categoryLogos[lookupKey] || "";
 
                     // Build receipt block for this specific category
                     let receiptDiv = document.createElement("div");

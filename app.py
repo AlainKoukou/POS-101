@@ -41,11 +41,19 @@ def index():
     categories = cursor.fetchall()
     conn.close()
 
+    processed_items = []
+    for item in items:
+        item_dict = dict(item)
+        cat_name = item_dict.get("category_name") or "Default"
+        hue = abs(hash(cat_name)) % 360
+        item_dict["category_color"] = f"hsl({hue}, 65%, 45%)"
+        processed_items.append(item_dict)
+
     return render_template(
         "index.html", 
         username=session["username"], 
         role=session["role"], 
-        items=items,
+        items=processed_items,
         categories=categories
     )
 
@@ -408,20 +416,22 @@ def daily_report():
     
     grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
 
-    cursor.execute("""
+   cursor.execute("""
         SELECT 
             COALESCE(i.category_name, 'Uncategorized') as category_name,
+            COALESCE(c.is_church_report, TRUE) as is_church_report,
             si.item_name, 
             SUM(si.line_total) as total_sales, 
             SUM(si.quantity) as total_qty
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
+        LEFT JOIN categories c ON i.category_name = c.name
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
-        GROUP BY COALESCE(i.category_name, 'Uncategorized'), si.item_name
+        GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
     """)
     aggregated_items = cursor.fetchall()
 
@@ -435,12 +445,11 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
-        if category == "Church":
+        # Accumulate dynamically based on category flag configuration
+        if item["is_church_report"]:
             church_total += float(item["total_sales"])
-
-        elif category == "Kbar":
+        else:
             kbar_total += float(item["total_sales"])
-
     cashier_summary = {}
     for item in report_items:
         cashier = item["cashier_name"]
@@ -467,11 +476,11 @@ def daily_report():
         kbar_total=kbar_total,
         cashier_summary=cashier_summary,
         item_summary_by_category=item_summary_by_category,
+        church_items=church_items,
         voided_items=voided_items,
         username=session["username"], 
         role=session["role"]
     )
-
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
@@ -573,6 +582,9 @@ def add_category():
     if not category_name:
         return redirect("/admin")
 
+    # Capture checkbox value (will be 'true' if checked, None if unchecked)
+    is_church_report = True if request.form.get("is_church_report") == "true" else False
+
     logo_filename = None
     file = request.files.get("logo")
 
@@ -587,10 +599,12 @@ def add_category():
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO categories (name, logo) VALUES (%s, %s)
-            ON CONFLICT (name) DO UPDATE SET logo = EXCLUDED.logo
+            INSERT INTO categories (name, logo, is_church_report) VALUES (%s, %s, %s)
+            ON CONFLICT (name) DO UPDATE 
+            SET logo = COALESCE(EXCLUDED.logo, categories.logo), 
+                is_church_report = EXCLUDED.is_church_report
             """,
-            (category_name, logo_filename)
+            (category_name, logo_filename, is_church_report)
         )
         conn.commit()
         cursor.close()
