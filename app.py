@@ -36,24 +36,15 @@ def index():
     cursor.execute("SELECT name, category_name, price FROM items ORDER BY category_name ASC, name ASC")
     items = cursor.fetchall()
     
-    # Fetch categories including their logo filename for dynamic receipt rendering
     cursor.execute("SELECT name, logo FROM categories")
     categories = cursor.fetchall()
     conn.close()
-
-    processed_items = []
-    for item in items:
-        item_dict = dict(item)
-        cat_name = item_dict.get("category_name") or "Default"
-        hue = abs(hash(cat_name)) % 360
-        item_dict["category_color"] = f"hsl({hue}, 65%, 45%)"
-        processed_items.append(item_dict)
 
     return render_template(
         "index.html", 
         username=session["username"], 
         role=session["role"], 
-        items=processed_items,
+        items=items,
         categories=categories
     )
 
@@ -149,14 +140,7 @@ def update_price():
                     (converted_price, item_name)
             )
     except ValueError:
-        try:
-            # Code handling the price update conversion
-            price = float(request.form['price'])
-        except ValueError:
-            flash('Invalid price format entered. Please provide a valid number.', 'danger')
-            return redirect(url_for('admin'))
-
-
+        pass
 
     conn.commit()
     conn.close()
@@ -445,11 +429,11 @@ def daily_report():
             item_summary_by_category[category] = []
         item_summary_by_category[category].append(item)
 
-        # Accumulate dynamically based on category flag configuration
         if item["is_church_report"]:
             church_total += float(item["total_sales"])
         else:
             kbar_total += float(item["total_sales"])
+
     cashier_summary = {}
     for item in report_items:
         cashier = item["cashier_name"]
@@ -476,11 +460,11 @@ def daily_report():
         kbar_total=kbar_total,
         cashier_summary=cashier_summary,
         item_summary_by_category=item_summary_by_category,
-        church_items=church_items,
         voided_items=voided_items,
         username=session["username"], 
         role=session["role"]
     )
+
 
 @app.route("/void_page", methods=["GET", "POST"])
 def void_page():
@@ -509,11 +493,9 @@ def void_page():
     search_query = request.args.get("search", "").strip()
     selected_category = request.args.get("category", "").strip()
 
-    # Fetch categories for the filter dropdown
     cursor.execute("SELECT name FROM categories ORDER BY name ASC")
     categories = cursor.fetchall()
 
-    # Build dynamic query to search across columns and filter by category
     query = """
         SELECT si.sale_item_id, s.sale_id, s.cashier_name, si.item_name, si.quantity, si.line_total, s.sale_datetime, i.category_name
         FROM sale_items si
@@ -582,7 +564,6 @@ def add_category():
     if not category_name:
         return redirect("/admin")
 
-    # Checkbox evaluation
     is_church_report = True if request.form.get("is_church_report") == "true" else False
 
     logo_filename = None
@@ -611,7 +592,7 @@ def add_category():
         conn.close()
     except Exception as e:
         print(f"CRITICAL ERROR adding category: {e}")
-        raise e  # This will surface the exact error if your SQL column is missing
+        raise e
 
     return redirect("/admin")
 

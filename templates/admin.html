@@ -44,7 +44,7 @@
                     <td>
                         <form action="/delete_user" method="POST">
                             <input type="hidden" name="username" value="{{ user.username }}">
-                            <button type="submit" class="btn">Delete</button>
+                            <button type="submit" class="btn" style="background-color: #dc3545; color: white;">Delete</button>
                         </form>
                     </td>
 
@@ -53,7 +53,7 @@
                             style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <input type="hidden" name="username" value="{{ user.username }}">
                             <input type="text" name="new_password" required>
-                            <button type="submit" class="btn">Update</button>
+                            <button type="submit" class="btn" style="background-color: #007bff; color: white;">Update</button>
                         </form>
                     </td>
                 </tr>
@@ -82,7 +82,7 @@
                     </select>
                 </div>
 
-                <button type="submit" class="btn">Add User</button>
+                <button type="submit" class="btn" style="background-color: #007bff; color: white;">Add User</button>
             </form>
         </div>
 
@@ -95,6 +95,51 @@
                     <th>Category Name</th>
                     <th>Church Report</th>
                     <th>Delete</th>
+                </tr>
+                {% for category in categories %}
+                <tr>
+                    <td>
+                        {% if category.logo %}
+                            <img src="{{ url_for('static', filename='uploads/' + category.logo) }}" alt="{{ category.name }}" style="width: 40px; height: 40px; object-fit: contain;">
+                        {% else %}
+                            <span class="muted">No Logo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ category.name }}</td>
+                    <td>{{ 'Yes' if category.is_church_report else 'No' }}</td>
+                    <td>
+                        <form action="/delete_category" method="POST">
+                            <input type="hidden" name="name" value="{{ category.name }}">
+                            <button type="submit" class="btn" style="background-color: #dc3545; color: white;">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <br>
+
+            <h3>Add Category</h3>
+            <form action="/add_category" method="POST" enctype="multipart/form-data" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category Name</label>
+                    <input type="text" name="name" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0; display:flex; align-items:center; height: 38px;">
+                    <label style="display:flex; align-items:center; cursor:pointer; gap:6px; margin-bottom:0;">
+                        <input type="checkbox" name="is_church_report" value="true" checked> Include in Church Report
+                    </label>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category Logo</label>
+                    <input type="file" name="logo" accept="image/*">
+                </div>
+
+                <button type="submit" class="btn" style="background-color: #007bff; color: white;">Add Category</button>
+            </form>
+        </div>
 
         <div class="card">
             <h2>Add New Item</h2>
@@ -125,7 +170,7 @@
                     <small style="display: block; color: gray; font-size: 0.8em;">Rate: 90,000 LBP = $1</small>
                 </div>
 
-                <button type="submit" class="btn">Add Item</button>
+                <button type="submit" class="btn" style="background-color: #007bff; color: white;">Add Item</button>
             </form>
         </div>
 
@@ -153,7 +198,7 @@
                     <td>
                         <form action="/delete_item" method="POST">
                             <input type="hidden" name="name" value="{{ item.name }}">
-                            <button type="submit" class="btn">Delete</button>
+                            <button type="submit" class="btn" style="background-color: #dc3545; color: white;">Delete</button>
                         </form>
                     </td>
                     
@@ -163,7 +208,7 @@
                             <input type="hidden" name="name" value="{{ item.name }}">
                             <input type="number" step="any" name="new_price" placeholder="USD" style="width: 80px;">
                             <input type="number" step="any" name="new_price_lbp" placeholder="LBP" style="width: 90px;">
-                            <button type="submit" class="btn">Update</button>
+                            <button type="submit" class="btn" style="background-color: #007bff; color: white;">Update</button>
                         </form>
                     </td>
                 </tr>
