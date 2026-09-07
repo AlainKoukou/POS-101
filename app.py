@@ -416,7 +416,7 @@ def daily_report():
     
     grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
 
-   cursor.execute("""
+    cursor.execute("""
         SELECT 
             COALESCE(i.category_name, 'Uncategorized') as category_name,
             COALESCE(c.is_church_report, TRUE) as is_church_report,
