@@ -87,40 +87,6 @@
             {% endif %}
         </div>
 
-        <!-- All Individual Transactions -->
-        <div class="card">
-            <h2>All Transactions Today</h2>
-            <table>
-                <tr>
-                    <th>Sale ID</th>
-                    <th>Time</th>
-                    <th>Cashier</th>
-                    <th>Item Name</th>
-                    <th>Category</th>
-                    <th>Qty</th>
-                    <th>Line Total</th>
-                </tr>
-                {% for item in report_items %}
-                <tr>
-                    <td>#{{ item.sale_id }}</td>
-                    <td>{{ item.sale_datetime }}</td>
-                    <td>{{ item.cashier_name }}</td>
-                    <td>{{ item.item_name }}</td>
-                    <td>{{ item.category_name or 'Uncategorized' }}</td>
-                    <td>{{ item.quantity }}</td>
-                    <td>
-                        ${{ "%.2f"|format(item.line_total) }}
-                        <br><small style="color: gray;">({{ "%.0f"|format(item.line_total * 90000) }} LBP)</small>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7">No transactions recorded today.</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-
         <!-- Voided Items List -->
         <div class="card">
             <h2>Voided Items</h2>

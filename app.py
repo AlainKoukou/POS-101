@@ -606,118 +606,116 @@ def download_report():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    # Get aggregated sales items with their church report flag and category
+    cursor.execute("""
         SELECT 
-            COALESCE(i.category_name, 'Uncategorized') as cat_name,
+            COALESCE(i.category_name, 'Uncategorized') as category_name,
+            COALESCE(c.is_church_report, TRUE) as is_church_report,
             si.item_name, 
-            SUM(si.quantity) as total_qty, 
-            SUM(si.line_total) as total_line
+            SUM(si.line_total) as total_sales, 
+            SUM(si.quantity) as total_qty
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
+        LEFT JOIN categories c ON i.category_name = c.name
         WHERE DATE(s.sale_datetime) = CURRENT_DATE
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
-        GROUP BY cat_name, si.item_name
-        ORDER BY cat_name
-    """
-    )
-    raw_items = cursor.fetchall()
-
-    pdf_categories = {}
-    for row in raw_items:
-        cat = row["cat_name"]
-        if cat not in pdf_categories:
-            pdf_categories[cat] = []
-        pdf_categories[cat].append((row["item_name"], row["total_qty"], row["total_line"]))
-
-    cursor.execute(
-        """
-        SELECT COALESCE(SUM(si.line_total),0) as total_sum
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.sale_id
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
-        AND si.sale_item_id NOT IN (
-            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
-        )
-    """
-    )
-    total_row = cursor.fetchone()
-    total = total_row["total_sum"] if total_row else 0
+        GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
+    """)
+    aggregated_items = cursor.fetchall()
+    cursor.close()
     conn.close()
 
-    from reportlab.pdfgen import canvas
+    church_items = []
+    kbar_items = []
+    church_total = 0.0
+    kbar_total = 0.0
 
+    for item in aggregated_items:
+        sale_val = float(item["total_sales"])
+        if item["is_church_report"]:
+            church_items.append(item)
+            church_total += sale_val
+        else:
+            kbar_items.append(item)
+            kbar_total += sale_val
+
+    grand_total = church_total + kbar_total
+
+    # Generate PDF using ReportLab
     buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    elements = []
+    styles = getSampleStyleSheet()
 
-    report_date = datetime.now().strftime("%Y-%m-%d")
-    y = 800
+    elements.append(Paragraph("Daily Sales Report", styles['Title']))
+    elements.append(Paragraph(f"Report Date: {datetime.now().strftime('%Y-%m-%d')}", styles['Normal']))
+    elements.append(Spacer(1, 10))
+    
+    grand_lbp = grand_total * 90000
+    elements.append(Paragraph(f"<b>Grand Total: ${grand_total:.2f} ({grand_lbp:,.0f} LBP)</b>", styles['Heading2']))
+    elements.append(Spacer(1, 10))
 
-    pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawString(200, y, "Daily Sales Report")
+    # --- Church Sales Section (Combined without internal categories) ---
+    church_lbp = church_total * 90000
+    elements.append(Paragraph(f"<b>Church Sales — Subtotal: ${church_total:.2f} ({church_lbp:,.0f} LBP)</b>", styles['Heading3']))
+    
+    church_table_data = [["Item Name", "Qty", "Sales Total"]]
+    if church_items:
+        for ci in church_items:
+            ci_lbp = float(ci['total_sales']) * 90000
+            church_table_data.append([
+                ci['item_name'], 
+                str(ci['total_qty']), 
+                f"${float(ci['total_sales']):.2f} ({ci_lbp:,.0f} LBP)"
+            ])
+    else:
+        church_table_data.append(["No church sales today.", "", ""])
 
-    y -= 30
-    pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, y, f"Report Date: {report_date}")
+    t_church = Table(church_table_data, colWidths=[250, 80, 210])
+    t_church.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+    ]))
+    elements.append(t_church)
+    elements.append(Spacer(1, 15))
 
-    y -= 25
-    pdf.setFont("Helvetica-Bold", 14)
-    total_lbp = total * 90000
-    pdf.drawString(50, y, f"Grand Total: ${total:.2f}  ({total_lbp:,.0f} LBP)")
+    # --- Kbar Sales Section ---
+    kbar_lbp = kbar_total * 90000
+    elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_total:.2f} ({kbar_lbp:,.0f} LBP)</b>", styles['Heading3']))
+    
+    kbar_table_data = [["Item Name", "Qty", "Sales Total"]]
+    if kbar_items:
+        for ki in kbar_items:
+            ki_lbp = float(ki['total_sales']) * 90000
+            kbar_table_data.append([
+                ki['item_name'], 
+                str(ki['total_qty']), 
+                f"${float(ki['total_sales']):.2f} ({ki_lbp:,.0f} LBP)"
+            ])
+    else:
+        kbar_table_data.append(["No Kbar sales today.", "", ""])
 
-    y -= 35
+    t_kbar = Table(kbar_table_data, colWidths=[250, 80, 210])
+    t_kbar.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+    ]))
+    elements.append(t_kbar)
 
-    for category_name, items in pdf_categories.items():
-        if y < 120:
-            pdf.showPage()
-            y = 800
-
-        cat_total = sum(item[2] for item in items)
-        cat_total_lbp = cat_total * 90000
-
-        pdf.setFont("Helvetica-Bold", 12)
-        pdf.drawString(50, y, f"Category: {category_name}")
-
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawRightString(
-            550, y, f"Subtotal: ${cat_total:.2f} ({cat_total_lbp:,.0f} LBP)"
-        )
-
-        y -= 20
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(60, y, "Item Name")
-        pdf.drawString(240, y, "Qty")
-        pdf.drawString(320, y, "Sales Total")
-        y -= 15
-
-        pdf.setFont("Helvetica", 10)
-        for item in items:
-            if y < 50:
-                pdf.showPage()
-                y = 800
-            item_sales_lbp = item[2] * 90000
-            pdf.drawString(60, y, str(item[0]))
-            pdf.drawString(240, y, str(item[1]))
-            pdf.drawString(320, y, f"${item[2]:.2f} ({item_sales_lbp:,.0f} LBP)")
-            y -= 15
-        y -= 15
-
-    pdf.setFont("Helvetica-Oblique", 8)
-    pdf.setFillColorRGB(0.4, 0.4, 0.4)
-    pdf.drawCentredString(300, 30, "Developed by Alain Koukou")
-
-    pdf.save()
+    doc.build(elements)
     buffer.seek(0)
-
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name="daily_report.pdf",
-        mimetype="application/pdf",
-    )
+    return send_file(buffer, as_attachment=True, download_name=f"daily_report_{datetime.now().strftime('%Y-%m-%d')}.pdf", mimetype='application/pdf')
 
 
 if __name__ == "__main__":
