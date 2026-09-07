@@ -53,7 +53,7 @@
             </div>
 
             <div class="summary-box">
-                <h3>kbar_total</h3>
+                <h3>Kbar Sales</h3>
                 <div class="value">${{ "%.2f"|format(kbar_total) }}</div>
                 <div style="font-size: 0.85em; color: #555; margin-top: 4px;">{{ "%.0f"|format(kbar_total * 90000) }} LBP</div>
             </div>
@@ -65,65 +65,64 @@
         </div>
 
         <div class="card">
-            <h2 class="section-title">Cashier Totals</h2>
+            <h2>Categories</h2>
 
-            {% if cashier_summary %}
             <table>
                 <tr>
-                    <th>Cashier</th>
-                    <th>Total Sales</th>
+                    <th>Logo</th>
+                    <th>Category Name</th>
+                    <th>Church Report</th>
+                    <th>Delete</th>
                 </tr>
-                {% for cashier_name, total_sales in cashier_summary.items() %}
+                {% for category in categories %}
                 <tr>
-                    <td>{{ cashier_name }}</td>
                     <td>
-                        ${{ "%.2f"|format(total_sales) }} 
-                        <br><small style="color: gray;">({{ "%.0f"|format(total_sales * 90000) }} LBP)</small>
+                        {% if category.logo %}
+                            <img src="{{ url_for('static', filename='uploads/' + category.logo) }}" alt="{{ category.name }}" style="width: 40px; height: 40px; object-fit: contain;">
+                        {% else %}
+                            <span class="muted">No Logo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ category.name }}</td>
+                    <td>
+                        {% if category.is_church_report %}
+                            <span style="color: green; font-weight: bold;">Yes</span>
+                        {% else %}
+                            <span style="color: gray;">No</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form action="/delete_category" method="POST">
+                            <input type="hidden" name="name" value="{{ category.name }}">
+                            <button type="submit" class="btn">Delete</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
             </table>
-            {% else %}
-            <div class="report-table-empty">No cashier activity recorded for today.</div>
-            {% endif %}
-        </div>
 
-        <div class="card">
-            <h2 class="section-title">Items Summary by Category</h2>
+            <br>
 
-            {% if item_summary_by_category %}
-                {% for category_name, items in item_summary_by_category.items() %}
-                {% set cat_total = items | sum(attribute='total_sales') %}
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; margin-top: 25px; padding-bottom: 8px;">
-                    <h3 style="margin: 0; color: #333;">{{ category_name }}</h3>
-                    <span style="font-weight: bold; color: #4b5563; font-size: 0.95em;">
-                        Subtotal: ${{ "%.2f"|format(cat_total) }} 
-                        <small style="color: gray; font-weight: normal;">({{ "%.0f"|format(cat_total * 90000) }} LBP)</small>
-                    </span>
+            <h3>Add Category</h3>
+            <form action="/add_category" method="POST" enctype="multipart/form-data" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category Name</label>
+                    <input type="text" name="name" required>
                 </div>
 
-                <table>
-                    <tr>
-                        <th>Item Name</th>
-                        <th>Total Quantity Sold</th>
-                        <th>Total Sales</th>
-                    </tr>
-                    {% for item in items %}
-                    <tr>
-                        <td>{{ item.item_name }}</td>
-                        <td>{{ item.total_qty }}</td>
-                        <td>
-                            ${{ "%.2f"|format(item.total_sales) }} 
-                            <br><small style="color: gray;">({{ "%.0f"|format(item.total_sales * 90000) }} LBP)</small>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
-                {% endfor %}
-            {% else %}
-            <div class="report-table-empty">No sales recorded for today.</div>
-            {% endif %}
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Category Logo</label>
+                    <input type="file" name="logo" accept="image/*">
+                </div>
+
+                <div class="form-group" style="margin-bottom:0; display: flex; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="checkbox" name="is_church_report"> Add to Church's Daily Report
+                    </label>
+                </div>
+
+                <button type="submit" class="btn">Add Category</button>
+            </form>
         </div>
 
         <div class="card">

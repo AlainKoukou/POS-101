@@ -49,7 +49,6 @@ body {
 }
 
 .btn {
-    background: #1f6feb;
     color: white;
     border: none;
     border-radius: 8px;
@@ -60,24 +59,7 @@ body {
 
 
 .btn:hover {
-    background: #1557b0;
-}
-
-    /* Category-based button colors */
-.btn.btn-category-default {
-    background: #1f6feb; 
-    color: white;
-}
-.btn.btn-category-default:hover {
-    background: #1557b0;
-}
-
-.btn.btn-category-kbar {
-    background: #10b981; 
-    color: white;
-}
-.btn.btn-category-kbar:hover {
-    background: #059669;
+    opacity: 0.9;
 }
 
 .btn-full {
@@ -218,15 +200,15 @@ a:hover {
 
 .items-grid, .items-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); /* Adjusts how many fit per row and increases minimum card width */
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
 }
 
 .item-card, .item-btn {
     min-width: 180px;
-    min-height: 200px; /* Increases the height of the box */
-    padding: 20px;     /* Gives more breathing room inside the box */
-    font-size: 24px;   /* Makes text easier to read */
+    min-height: 200px;
+    padding: 20px;
+    font-size: 24px;
 }
 
 .item-card h3, .item-btn h3, .item-name {
@@ -284,8 +266,6 @@ a:hover {
     .receipt-page-break {
         page-break-after: always;
         break-after: page;
-        height: 20px; /* Adds a clean physical gap on paper if continuous roll */
+        height: 20px;
     }
-
-    }
-
+}

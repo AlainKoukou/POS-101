@@ -93,6 +93,7 @@
                 <tr>
                     <th>Logo</th>
                     <th>Category Name</th>
+                    <th>Church Report</th>
                     <th>Delete</th>
                 </tr>
                 {% for category in categories %}
@@ -105,6 +106,13 @@
                         {% endif %}
                     </td>
                     <td>{{ category.name }}</td>
+                    <td>
+                        {% if category.is_church_report %}
+                            <span style="color: green; font-weight: bold;">Yes</span>
+                        {% else %}
+                            <span style="color: gray;">No</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <form action="/delete_category" method="POST">
                             <input type="hidden" name="name" value="{{ category.name }}">
@@ -122,6 +130,12 @@
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Category Name</label>
                     <input type="text" name="name" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0; display:flex; align-items:center; height: 38px;">
+                    <label style="display:flex; align-items:center; cursor:pointer; gap:6px; margin-bottom:0;">
+                        <input type="checkbox" name="is_church_report" value="true" checked> Include in Church Report
+                    </label>
                 </div>
 
                 <div class="form-group" style="margin-bottom:0;">
@@ -195,14 +209,14 @@
                     </td>
                     
                     <td>
-                            <form action="/update_price" method="POST" enctype="multipart/form-data"
-                                style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                                <input type="hidden" name="name" value="{{ item.name }}">
-                                <input type="number" step="any" name="new_price" placeholder="USD" style="width: 80px;">
-                                <input type="number" step="any" name="new_price_lbp" placeholder="LBP" style="width: 90px;">
-                                <button type="submit" class="btn">Update</button>
-                            </form>
-                        </td>
+                        <form action="/update_price" method="POST" enctype="multipart/form-data"
+                            style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="hidden" name="name" value="{{ item.name }}">
+                            <input type="number" step="any" name="new_price" placeholder="USD" style="width: 80px;">
+                            <input type="number" step="any" name="new_price_lbp" placeholder="LBP" style="width: 90px;">
+                            <button type="submit" class="btn">Update</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </table>
