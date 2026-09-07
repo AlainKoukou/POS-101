@@ -718,10 +718,21 @@ def download_report():
     ]))
     elements.append(t_kbar)
 
+    from reportlab.lib.styles import ParagraphStyle
+    sig_style = ParagraphStyle(
+        'DeveloperSignature',
+        parent=styles['Normal'],
+        textColor=colors.HexColor('#6c757d'),
+        fontSize=9,
+        alignment=2  # Right-aligned
+    )
+
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("Developed by Alain Koukou", sig_style))
+    
     doc.build(elements)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"daily_report_{datetime.now().strftime('%Y-%m-%d')}.pdf", mimetype='application/pdf')
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
