@@ -582,7 +582,7 @@ def add_category():
     if not category_name:
         return redirect("/admin")
 
-    # Capture checkbox value (will be 'true' if checked, None if unchecked)
+    # Checkbox evaluation
     is_church_report = True if request.form.get("is_church_report") == "true" else False
 
     logo_filename = None
@@ -610,7 +610,8 @@ def add_category():
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error adding category: {e}")
+        print(f"CRITICAL ERROR adding category: {e}")
+        raise e  # This will surface the exact error if your SQL column is missing
 
     return redirect("/admin")
 
