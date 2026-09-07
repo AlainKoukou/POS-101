@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
+app.jinja_env.filters['ord'] = ord
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
