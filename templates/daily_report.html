@@ -7,6 +7,48 @@
 </head>
 
 <body>
+    <div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Per-Cashier Summary</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Cashier Name</th>
+                    <th>Total Items Sold</th>
+                    <th>Total Sales</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if cashier_summary_dict %}
+                    {% for cashier, data in cashier_summary_dict.items() %}
+                    <tr>
+                        <td><strong>{{ cashier }}</strong></td>
+                        <td>{{ data.qty }}</td>
+                        <td>
+                            ${{ "%.2f"|format(data.sales) }} 
+                            <small class="text-muted">({{ "{:,.0f}".format(data.sales * 90000) }} LBP)</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-secondary fw-bold">
+                        <td>Total</td>
+                        <td>{{ total_cashier_qty }}</td>
+                        <td>
+                            ${{ "%.2f"|format(grand_total) }} 
+                            <small>({{ "{:,.0f}".format(grand_total * 90000) }} LBP)</small>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center">No sales recorded today.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
 
     <div class="topbar">
         Logged in as: <strong>{{ username }}</strong> ({{ role }})

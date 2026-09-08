@@ -441,12 +441,15 @@ def daily_report():
         else:
             kbar_total += float(item["total_sales"])
 
-    cashier_summary = {}
+    cashier_summary_dict = {}
+    total_cashier_qty = 0
     for item in report_items:
         cashier = item["cashier_name"]
-        if cashier not in cashier_summary:
-            cashier_summary[cashier] = 0.0
-        cashier_summary[cashier] += float(item["line_total"])
+        if cashier not in cashier_summary_dict:
+            cashier_summary_dict[cashier] = {"qty": 0, "sales": 0.0}
+        cashier_summary_dict[cashier]["qty"] += int(item["quantity"])
+        cashier_summary_dict[cashier]["sales"] += float(item["line_total"])
+        total_cashier_qty += int(item["quantity"])
 
     cursor.execute("""
         SELECT si.item_name, si.line_total as price, v.void_datetime 
@@ -612,7 +615,7 @@ def download_report():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Get aggregated sales items with their church report flag and category
+
     cursor.execute("""
         SELECT 
             COALESCE(i.category_name, 'Uncategorized') as category_name,
@@ -631,6 +634,17 @@ def download_report():
         GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
     """)
     aggregated_items = cursor.fetchall()
+    cursor.execute("""
+        SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+    """)
+    report_items = cursor.fetchall()
+    
     cursor.close()
     conn.close()
 
@@ -649,6 +663,17 @@ def download_report():
             kbar_total += sale_val
 
     grand_total = church_total + kbar_total
+
+    cashier_summary_dict = {}
+    total_cashier_qty = 0
+    for item in report_items:
+        cashier = item["cashier_name"]
+        if cashier not in cashier_summary_dict:
+            cashier_summary_dict[cashier] = {"qty": 0, "sales": 0.0}
+        cashier_summary_dict[cashier]["qty"] += int(item["quantity"])
+        cashier_summary_dict[cashier]["sales"] += float(item["line_total"])
+        total_cashier_qty += int(item["quantity"])
+
 
     # Generate PDF using ReportLab
     buffer = io.BytesIO()
@@ -677,6 +702,43 @@ def download_report():
     grand_lbp = grand_total * 90000
     elements.append(Paragraph(f"<b>Grand Total: ${grand_total:.2f} ({grand_lbp:,.0f} LBP)</b>", styles['Heading2']))
     elements.append(Spacer(1, 15))
+
+    # --- Per-Cashier Summary Section ---
+    elements.append(Paragraph("<b>Per-Cashier Summary</b>", styles['Heading3']))
+    cashier_table_data = [["Cashier Name", "Total Items Sold", "Total Sales"]]
+    if cashier_summary_dict:
+        for cashier, data in cashier_summary_dict.items():
+            c_lbp = data['sales'] * 90000
+            cashier_table_data.append([
+                cashier,
+                str(data['qty']),
+                f"${data['sales']:.2f} ({c_lbp:,.0f} LBP)"
+            ])
+        cashier_table_data.append([
+            "Total",
+            str(total_cashier_qty),
+            f"${grand_total:.2f} ({grand_lbp:,.0f} LBP)"
+        ])
+    else:
+        cashier_table_data.append(["No sales recorded today.", "", ""])
+
+    t_cashier = Table(cashier_table_data, colWidths=[200, 100, 240])
+    t_cashier.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), primary_color),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('TOPPADDING', (0,0), (-1,0), 8),
+        ('ROWBACKGROUNDS', (0,1), (-1,-2 if len(cashier_summary_dict) > 0 else -1), [colors.white, light_bg]),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e5e7eb')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(t_cashier)
+    elements.append(Spacer(1, 20))
 
     # --- Church Sales Section (Combined without internal categories) ---
     church_lbp = church_total * 90000
