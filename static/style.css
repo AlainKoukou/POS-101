@@ -49,6 +49,7 @@ body {
 }
 
 .btn {
+    background-color: #1f6feb;
     color: white;
     border: none;
     border-radius: 8px;

@@ -656,7 +656,7 @@ def download_report():
     styles = getSampleStyleSheet()
 
     elements.append(Paragraph("Daily Sales Report", styles['Title']))
-    elements.append(Paragraph(f"Report Date: {datetime.now().strftime('%Y-%m-%d')}", styles['Normal']))
+    elements.append(Paragraph(f"Report Date: {datetime.now().strftime('%d-%m-%Y')}", styles['Normal']))
     elements.append(Spacer(1, 10))
     
     grand_lbp = grand_total * 90000
