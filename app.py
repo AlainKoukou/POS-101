@@ -750,7 +750,7 @@ def download_report():
     )
 
     elements.append(Spacer(1, 20))
-    elements.append(Paragraph("Developed by   Alain Koukou", sig_style))
+    elements.append(Paragraph("Developed by Alain Koukou", sig_style))
     
     doc.build(elements)
     buffer.seek(0)
