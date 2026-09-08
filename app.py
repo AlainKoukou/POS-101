@@ -131,28 +131,34 @@ def update_price():
     new_price = request.form.get("new_price")
     new_price_lbp = request.form.get("new_price_lbp")
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
+    conn = None
     try:
+        price = None
         if new_price and new_price.strip() != "":
-            cursor.execute(
-                "UPDATE items SET price = %s WHERE name = %s",
-                (float(new_price), item_name)
-            )
+            parsed_price = float(new_price)
+            if parsed_price >= 0:
+                price = parsed_price
         elif new_price_lbp and new_price_lbp.strip() != "":
             raw_lbp = float(new_price_lbp)
-            raw_lbp = round(raw_lbp, -3)
-            converted_price = round(raw_lbp / 90000.0, 4)
+            if raw_lbp >= 0:
+                raw_lbp = round(raw_lbp, -3)
+                price = round(raw_lbp / 90000.0, 4)
+
+        if price is not None and item_name:
+            conn = get_db_connection()
+            cursor = conn.cursor()
             cursor.execute(
                 "UPDATE items SET price = %s WHERE name = %s",
-                    (converted_price, item_name)
+                (price, item_name)
             )
+            conn.commit()
+            cursor.close()
     except ValueError:
         pass
+    finally:
+        if conn:
+            conn.close()
 
-    conn.commit()
-    conn.close()
     return redirect("/admin")
 
 
@@ -192,14 +198,16 @@ def add_item():
     name = request.form["name"]
     category_name = request.form["category_name"]
 
-    price_usd_str = request.form.get("price", "")
-    price_lbp_str = request.form.get("price_lbp", "")
+    price_usd_str = request.form.get("price_usd")
+    price_lbp_str = request.form.get("price_lbp")
+    price = 0.0
 
     try:
         if price_usd_str and float(price_usd_str) > 0:
             price = float(price_usd_str)
         elif price_lbp_str and float(price_lbp_str) > 0:
-            raw_lbp = round(raw_lbp, -3)
+            raw_lbp = float(price_lbp_str)        # <--- Assign it first!
+            raw_lbp = round(raw_lbp, -3)          # <--- Now round it safely
             price = round(raw_lbp / 90000.0, 4)
         else:
             return "Error: A valid price in USD or LBP must be provided."
