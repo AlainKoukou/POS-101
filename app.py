@@ -4,6 +4,7 @@ import os
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, session, jsonify, send_file
@@ -740,7 +741,7 @@ def download_report():
     ]))
     elements.append(t_kbar)
 
-    from reportlab.lib.styles import ParagraphStyle
+    
     sig_style = ParagraphStyle(
         'DeveloperSignature',
         parent=styles['Normal'],
