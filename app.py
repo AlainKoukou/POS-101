@@ -469,6 +469,7 @@ def daily_report():
         church_total=church_total,
         kbar_total=kbar_total,
         cashier_summary=cashier_summary_dict,
+        total_cashier_qty=total_cashier_qty,
         item_summary_by_category=item_summary_by_category,
         voided_items=voided_items,
         username=session["username"], 
