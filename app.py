@@ -468,7 +468,7 @@ def daily_report():
         grand_total=grand_total, 
         church_total=church_total,
         kbar_total=kbar_total,
-        cashier_summary=cashier_summary,
+        cashier_summary=cashier_summary_dict,
         item_summary_by_category=item_summary_by_category,
         voided_items=voided_items,
         username=session["username"], 
@@ -644,7 +644,7 @@ def download_report():
         )
     """)
     report_items = cursor.fetchall()
-    
+
     cursor.close()
     conn.close()
 
