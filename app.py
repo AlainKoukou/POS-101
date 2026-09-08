@@ -141,7 +141,9 @@ def update_price():
                 (float(new_price), item_name)
             )
         elif new_price_lbp and new_price_lbp.strip() != "":
-            converted_price = round(float(new_price_lbp) / 90000.0, 4)
+            raw_lbp = float(new_price_lbp)
+            raw_lbp = round(raw_lbp, -3)
+            converted_price = round(raw_lbp / 90000.0, 4)
             cursor.execute(
                 "UPDATE items SET price = %s WHERE name = %s",
                     (converted_price, item_name)
@@ -197,7 +199,7 @@ def add_item():
         if price_usd_str and float(price_usd_str) > 0:
             price = float(price_usd_str)
         elif price_lbp_str and float(price_lbp_str) > 0:
-            raw_lbp = float(price_lbp_str)
+            raw_lbp = round(raw_lbp, -3)
             price = round(raw_lbp / 90000.0, 4)
         else:
             return "Error: A valid price in USD or LBP must be provided."
