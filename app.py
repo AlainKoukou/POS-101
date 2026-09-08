@@ -655,13 +655,27 @@ def download_report():
     elements = []
     styles = getSampleStyleSheet()
 
+    primary_color = colors.HexColor('#1f6feb')
+    dark_neutral = colors.HexColor('#111827')
+    light_bg = colors.HexColor('#f3f4f6')
+    border_color = colors.HexColor('#dcdcdc')
+
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Title'],
+        textColor=dark_neutral,
+        fontSize=24,
+        alignment=0,
+        spaceAfter=4
+    )   
+    
     elements.append(Paragraph("Daily Sales Report", styles['Title']))
     elements.append(Paragraph(f"Report Date: {datetime.now().strftime('%d-%m-%Y')}", styles['Normal']))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 15))
     
     grand_lbp = grand_total * 90000
     elements.append(Paragraph(f"<b>Grand Total: ${grand_total:.2f} ({grand_lbp:,.0f} LBP)</b>", styles['Heading2']))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 15))
 
     # --- Church Sales Section (Combined without internal categories) ---
     church_lbp = church_total * 90000
@@ -685,8 +699,12 @@ def download_report():
         ('TEXTCOLOR', (0,0), (-1,0), colors.black),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('TOPPADDING', (0,0), (-1,0), 8),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, light_bg]),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     elements.append(t_church)
     elements.append(Spacer(1, 15))
@@ -713,8 +731,12 @@ def download_report():
         ('TEXTCOLOR', (0,0), (-1,0), colors.black),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('TOPPADDING', (0,0), (-1,0), 8),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, light_bg]),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     elements.append(t_kbar)
 
@@ -728,7 +750,7 @@ def download_report():
     )
 
     elements.append(Spacer(1, 20))
-    elements.append(Paragraph("Developed by Alain Koukou", sig_style))
+    elements.append(Paragraph("Developed by   Alain Koukou", sig_style))
     
     doc.build(elements)
     buffer.seek(0)
