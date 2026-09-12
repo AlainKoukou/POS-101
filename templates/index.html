@@ -111,11 +111,12 @@
         // Map categories to their uploaded logos from backend database (stored in lowercase for safe lookup)
         const categoryLogos = {
             {% for cat in categories %}
-            {{ (cat.name | trim | lower) | tojson }}: {{ (cat.logo if cat.logo else '') | tojson }},
+            [{{ (cat.name | trim | lower) | tojson }}]: {{ (cat.logo if cat.logo else '') | tojson }},
             {% endfor %}
         };
 
-        
+        function addItem(name, price, category) {
+            let existingItem = cart.find(item => item.name === name);
             if (existingItem) {
                 existingItem.quantity += 1;
                 existingItem.line_total = existingItem.quantity * existingItem.price;
