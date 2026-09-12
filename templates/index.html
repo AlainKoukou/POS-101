@@ -79,7 +79,7 @@
                         <button style="background-color: hsl({{ hue }}, 65%, 45%) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 20px !important; cursor: pointer !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; min-width: 180px !important; min-height: 200px !important; box-sizing: border-box !important; overflow: hidden !important;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|tojson }})'>
                             <strong style="font-size: 24px !important; text-transform: uppercase !important; font-weight: bold !important; margin-bottom: 4px !important; word-break: break-word !important; text-align: center !important;">{{ item.name }}</strong>
                             <span style="font-size: 1.2rem !important; font-weight: bold !important; margin-bottom: 2px !important;">${{ "%.2f"|format(item.price) }}</span>    
-                            <small style="font-size: 0.8em !important; opacity: 0.9 !important;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
+                            <small style="font-size: 1.1rem !important; opacity: 0.9 !important;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
                         </button>
                     {% endfor %}
                 </div>
@@ -289,7 +289,7 @@
                         <hr style="border: dashed 1px #000; margin: 5px 0;">
                         <hr style="border: dashed 1px #000; margin: 5px 0;">
                         <hr style="border: dashed 1px #000; margin: 5px 0;">
-                        <div style="height: 60px;"></div>
+                        <div style="height: 100px;"></div>
                     `;
 
                     receiptSection.appendChild(receiptDiv);
@@ -297,7 +297,7 @@
                     // Add page break between different category receipts if there are more following
                     if (index < categories.length - 1) {
                         let breakDiv = document.createElement("div");
-                        breakDiv.className = "receipt-page-break";
+                        sepDiv.innerHTML = `<hr style="border: dashed 2px #000; margin: 20px 0;">`;
                         receiptSection.appendChild(breakDiv);
                     }
                 });
