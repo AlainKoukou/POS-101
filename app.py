@@ -134,15 +134,14 @@ def update_price():
     conn = None
     try:
         price = None
-        if new_price and new_price.strip() != "":
-            parsed_price = float(new_price)
-            if parsed_price >= 0:
-                price = parsed_price
-        elif new_price_lbp and new_price_lbp.strip() != "":
+        if new_price_lbp and new_price_lbp.strip() != "":
             raw_lbp = float(new_price_lbp)
             if raw_lbp >= 0:
-                raw_lbp = round(raw_lbp, -3)
-                price = round(raw_lbp / 90000.0, 4)
+                price = int(round(raw_lbp, -3))
+        elif new_price and new_price.strip() != "":
+            parsed_price = float(new_price)
+            if parsed_price >= 0:
+                price = int(round(parsed_price * 90000, -3))
 
         if price is not None and item_name:
             conn = get_db_connection()
@@ -203,12 +202,10 @@ def add_item():
     price = 0.0
 
     try:
-        if price_usd_str and float(price_usd_str) > 0:
-            price = float(price_usd_str)
-        elif price_lbp_str and float(price_lbp_str) > 0:
-            raw_lbp = float(price_lbp_str)        # <--- Assign it first!
-            raw_lbp = round(raw_lbp, -3)          # <--- Now round it safely
-            price = round(raw_lbp / 90000.0, 4)
+        if price_lbp_str and float(price_lbp_str) > 0:
+            price = int(round(float(price_lbp_str), -3))
+        elif price_usd_str and float(price_usd_str) > 0:
+            price = int(round(float(price_usd_str) * 90000, -3))
         else:
             return "Error: A valid price in USD or LBP must be provided."
     except ValueError:
@@ -352,7 +349,7 @@ def checkout():
 
     data = request.get_json()
     cart = data.get("cart", [])
-    total = data.get("total", 0)
+    total = int(data.get("total", 0))
     cashier = session["username"]
 
     if not cart:
@@ -380,7 +377,7 @@ def checkout():
             INSERT INTO sale_items (sale_id, item_name, quantity, line_total)
             VALUES (%s, %s, %s, %s)
         """,
-            (sale_id, item["name"], item["quantity"], item["line_total"]),
+            (sale_id, item["name"], item["quantity"], int(item["line_total"])),
         )
 
     conn.commit()
@@ -415,7 +412,8 @@ def daily_report():
     """)
     report_items = cursor.fetchall()
     
-    grand_total = sum(float(item["line_total"]) for item in report_items) if report_items else 0.0
+    grand_total_lbp = sum(int(item["line_total"]) for item in report_items) if report_items else 0
+    grand_total_usd = grand_total_lbp / 90000.0
 
     cursor.execute("""
         SELECT 
@@ -661,28 +659,31 @@ def download_report():
 
     church_items = []
     kbar_items = []
-    church_total = 0.0
-    kbar_total = 0.0
+    church_total_lbp = 0.0
+    kbar_total_lbp = 0.0
 
     for item in aggregated_items:
-        sale_val = float(item["total_sales"])
+        sale_val_lbp = int(item["total_sales"])
         if item["is_church_report"]:
             church_items.append(item)
-            church_total += sale_val
+            church_total_lbp += sale_val_lbp
         else:
             kbar_items.append(item)
-            kbar_total += sale_val
+            kbar_total_lbp += sale_val_lbp
 
-    grand_total = church_total + kbar_total
+    grand_lbp = church_total_lbp + kbar_total_lbp
+    grand_usd = grand_lbp / 90000.0
+    church_usd = church_total_lbp / 90000.0
+    kbar_usd = kbar_total_lbp / 90000.0
 
     cashier_summary_dict = {}
     total_cashier_qty = 0
     for item in report_items:
         cashier = item["cashier_name"]
         if cashier not in cashier_summary_dict:
-            cashier_summary_dict[cashier] = {"qty": 0, "sales": 0.0}
+            cashier_summary_dict[cashier] = {"qty": 0, "sales_lbp": 0}
         cashier_summary_dict[cashier]["qty"] += int(item["quantity"])
-        cashier_summary_dict[cashier]["sales"] += float(item["line_total"])
+        cashier_summary_dict[cashier]["sales_lbp"] += int(item["line_total"])
         total_cashier_qty += int(item["quantity"])
 
 
@@ -710,25 +711,23 @@ def download_report():
     elements.append(Paragraph(f"Report Date: {datetime.now().strftime('%d-%m-%Y')}", styles['Normal']))
     elements.append(Spacer(1, 15))
     
-    grand_lbp = grand_total * 90000
-    elements.append(Paragraph(f"<b>Grand Total: ${grand_total:.2f} ({grand_lbp:,.0f} LBP)</b>", styles['Heading2']))
-    elements.append(Spacer(1, 15))
 
     # --- Per-Cashier Summary Section ---
     elements.append(Paragraph("<b>Per-Cashier Summary</b>", styles['Heading3']))
     cashier_table_data = [["Cashier Name", "Total Items Sold", "Total Sales"]]
     if cashier_summary_dict:
         for cashier, data in cashier_summary_dict.items():
-            c_lbp = data['sales'] * 90000
+            c_lbp = data['sales_lbp']
+            c_usd = c_lbp / 90000.0
             cashier_table_data.append([
                 cashier,
                 str(data['qty']),
-                f"${data['sales']:.2f} ({c_lbp:,.0f} LBP)"
+                f"${c_usd:.2f} ({c_lbp:,.0f} LBP)"
             ])
         cashier_table_data.append([
             "Total",
             str(total_cashier_qty),
-            f"${grand_total:.2f} ({grand_lbp:,.0f} LBP)"
+            f"${grand_usd:.2f} ({grand_lbp:,.0f} LBP)"
         ])
     else:
         cashier_table_data.append(["No sales recorded today.", "", ""])
@@ -751,18 +750,18 @@ def download_report():
     elements.append(t_cashier)
     elements.append(Spacer(1, 20))
 
-    # --- Church Sales Section (Combined without internal categories) ---
-    church_lbp = church_total * 90000
-    elements.append(Paragraph(f"<b>Church Sales — Subtotal: ${church_total:.2f} ({church_lbp:,.0f} LBP)</b>", styles['Heading3']))
+    # --- Church Sales Section ---
+    elements.append(Paragraph(f"<b>Church Sales — Subtotal: ${church_usd:.2f} ({church_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
     
     church_table_data = [["Item Name", "Qty", "Sales Total"]]
     if church_items:
         for ci in church_items:
-            ci_lbp = float(ci['total_sales']) * 90000
+            ci_lbp = int(ci['total_sales'])
+            ci_usd = ci_lbp / 90000.0
             church_table_data.append([
                 ci['item_name'], 
                 str(ci['total_qty']), 
-                f"${float(ci['total_sales']):.2f} ({ci_lbp:,.0f} LBP)"
+                f"${ci_usd:.2f} ({ci_lbp:,.0f} LBP)"
             ])
     else:
         church_table_data.append(["No church sales today.", "", ""])
@@ -784,17 +783,18 @@ def download_report():
     elements.append(Spacer(1, 15))
 
     # --- Kbar Sales Section ---
-    kbar_lbp = kbar_total * 90000
-    elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_total:.2f} ({kbar_lbp:,.0f} LBP)</b>", styles['Heading3']))
+
+    elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_usd:.2f} ({kbar_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
     
     kbar_table_data = [["Item Name", "Qty", "Sales Total"]]
     if kbar_items:
         for ki in kbar_items:
-            ki_lbp = float(ki['total_sales']) * 90000
+            ki_lbp = int(ki['total_sales'])
+            ki_usd = ki_lbp / 90000.0
             kbar_table_data.append([
                 ki['item_name'], 
                 str(ki['total_qty']), 
-                f"${float(ki['total_sales']):.2f} ({ki_lbp:,.0f} LBP)"
+                f"${ki_usd:.2f} ({ki_lbp:,.0f} LBP)"
             ])
     else:
         kbar_table_data.append(["No Kbar sales today.", "", ""])
