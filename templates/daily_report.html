@@ -35,20 +35,20 @@
         <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
             <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Grand Total</h3>
-                <h2 style="color: #007bff; margin: 5px 0;">${{ "%.2f"|format(grand_total) }}</h2>
-                <small style="color: gray;">{{ "%.0f"|format(grand_total * 90000) }} LBP</small>
+                <h2 style="color: #007bff; margin: 5px 0;">${{ "%.2f"|format(grand_total_usd) }}</h2>
+                <small style="color: gray;">{{ "{:,.0f}".format(grand_total_lbp) }} LBP</small>
             </div>
 
             <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Church Sales</h3>
-                <h2 style="color: #28a745; margin: 5px 0;">${{ "%.2f"|format(church_total) }}</h2>
-                <small style="color: gray;">{{ "%.0f"|format(church_total * 90000) }} LBP</small>
+                <h2 style="color: #28a745; margin: 5px 0;">${{ "%.2f"|format(church_total / 90000) }}</h2>
+                <small style="color: gray;">{{ "{:,.0f}".format(church_total) }} LBP</small>
             </div>
 
             <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
                 <h3>Kbar Sales</h3>
-                <h2 style="color: #ffc107; margin: 5px 0;">${{ "%.2f"|format(kbar_total) }}</h2>
-                <small style="color: gray;">{{ "%.0f"|format(kbar_total * 90000) }} LBP</small>
+                <h2 style="color: #ffc107; margin: 5px 0;">${{ "%.2f"|format(kbar_total / 90000) }}</h2>
+                <small style="color: gray;">{{ "{:,.0f}".format(kbar_total) }} LBP</small>
             </div>
 
             <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">
@@ -74,8 +74,8 @@
                             <td>{{ item.item_name }}</td>
                             <td>{{ item.total_qty }}</td>
                             <td>
-                                ${{ "%.2f"|format(item.total_sales) }} 
-                                <br><small style="color: gray;">({{ "%.0f"|format(item.total_sales * 90000) }} LBP)</small>
+                                ${{ "%.2f"|format(item.total_sales / 90000) }} 
+                                <br><small style="color: gray;">({{ "{:,.0f}".format(item.total_sales) }} LBP)</small>
                             </td>
                         </tr>
                         {% endfor %}
@@ -107,8 +107,8 @@
                                 <td><strong>{{ cashier }}</strong></td>
                                 <td>{{ data.qty }}</td>
                                 <td>
-                                    ${{ "%.2f"|format(data.sales) }} 
-                                    <small class="text-muted">({{ "{:,.0f}".format(data.sales * 90000) }} LBP)</small>
+                                    ${{ "%.2f"|format(data.sales / 90000) }} 
+                                    <small class="text-muted">({{ "{:,.0f}".format(data.sales) }} LBP)</small>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -116,8 +116,8 @@
                                 <td>Total</td>
                                 <td>{{ total_cashier_qty }}</td>
                                 <td>
-                                    ${{ "%.2f"|format(grand_total) }} 
-                                    <small>({{ "{:,.0f}".format(grand_total * 90000) }} LBP)</small>
+                                    ${{ "%.2f"|format(grand_total_usd) }} 
+                                    <small>({{ "{:,.0f}".format(grand_total_lbp) }} LBP)</small>
                                 </td>
                             </tr>
                         {% else %}
@@ -142,7 +142,10 @@
                 {% for void in voided_items %}
                 <tr>
                     <td>{{ void.item_name }}</td>
-                    <td>${{ "%.2f"|format(void.price) }}</td>
+                    <td>
+                        ${{ "%.2f"|format(void.price / 90000) }}
+                        <small style="color: gray;">({{ "{:,.0f}".format(void.price) }} LBP)</small>
+                    </td>
                     <td>{{ void.void_datetime }}</td>
                 </tr>
                 {% else %}
