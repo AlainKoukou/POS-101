@@ -297,7 +297,7 @@
                     // Add page break between different category receipts if there are more following
                     if (index < categories.length - 1) {
                         let breakDiv = document.createElement("div");
-                        sepDiv.innerHTML = `<hr style="border: dashed 2px #000; margin: 20px 0;">`;
+                        breakDiv.innerHTML = `<hr style="border: dashed 2px #000; margin: 20px 0;">`;
                         receiptSection.appendChild(sepDiv);
                     }
                 });
