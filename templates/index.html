@@ -78,8 +78,8 @@
                         
                         <button style="background-color: hsl({{ hue }}, 65%, 45%) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 20px !important; cursor: pointer !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; min-width: 180px !important; min-height: 200px !important; box-sizing: border-box !important; overflow: hidden !important;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|tojson }})'>
                             <strong style="font-size: 24px !important; text-transform: uppercase !important; font-weight: bold !important; margin-bottom: 4px !important; word-break: break-word !important; text-align: center !important;">{{ item.name }}</strong>
-                            <span style="font-size: 1.2rem !important; font-weight: bold !important; margin-bottom: 2px !important;">${{ "%.2f"|format(item.price) }}</span>    
-                            <small style="font-size: 1.1rem !important; opacity: 0.9 !important;">{{ "%.0f"|format(((item.price * 90000) / 1000) | round * 1000) }} LBP</small>
+                            <span style="font-size: 1.2rem !important; font-weight: bold !important; margin-bottom: 2px !important;">${{ "%.2f"|format(item.price / 90000) }}</span>    
+                            <small style="font-size: 1.1rem !important; opacity: 0.9 !important;">{{ "%.0f"|format(item.price) }} LBP</small>
                         </button>
                     {% endfor %}
                 </div>
@@ -172,13 +172,15 @@
                 li.style.borderRadius = "8px";
                 li.style.background = "#fafafa";
 
-                let unitLbp = item.price * EXCHANGE_RATE;
-                let lineLbp = item.line_total * EXCHANGE_RATE;
+                let unitLbp = item.price;
+                let lineLbp = item.line_total;
+                let unitUsd = unitLbp / EXCHANGE_RATE;
+                let lineUsd = lineLbp / EXCHANGE_RATE;
 
                 li.innerHTML = `
                     <div><strong>${item.name}</strong> <small style="color:#666;">(${item.category})</small></div>
-                    <div>Qty: ${item.quantity} | Unit: $${Number(item.price).toFixed(2)} (${Math.round(unitLbp).toLocaleString()} LBP)</div>
-                    <div>Line Total: $${Number(item.line_total).toFixed(2)} (${Math.round(lineLbp).toLocaleString()} LBP)</div>
+                    <div>Qty: ${item.quantity} | Unit: $${unitUsd.toFixed(2)} (${Math.round(unitLbp).toLocaleString()} LBP)</div>
+                    <div>Line Total: $${lineUsd.toFixed(2)} (${Math.round(lineLbp).toLocaleString()} LBP)</div>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
                         <button class="btn" style="background: #1f6feb;" onclick='addItem(${JSON.stringify(item.name)}, ${item.price}, ${JSON.stringify(item.category)})'>+</button>
                         <button class="btn" style="background:#f59e0b;" onclick='decreaseItem(${JSON.stringify(item.name)})'>-</button>
@@ -190,8 +192,9 @@
                 total += item.line_total;
             });
 
-            document.getElementById("total").textContent = total.toFixed(2);
-            document.getElementById("total-lbp").textContent = Math.round(total * EXCHANGE_RATE).toLocaleString();
+            let totalUsd = total / EXCHANGE_RATE;
+            document.getElementById("total").textContent = totalUsd.toFixed(2);
+            document.getElementById("total-lbp").textContent = Math.round(total).toLocaleString();
         }
 
         function checkout() {
@@ -233,8 +236,8 @@
 
                 categories.forEach((catName, index) => {
                     let catItems = groupedByCategory[catName];
-                    let catTotal = catItems.reduce((sum, item) => sum + item.line_total, 0);
-                    let catTotalLbp = Math.round(catTotal * EXCHANGE_RATE);
+                    let catTotalLbp = catItems.reduce((sum, item) => sum + item.line_total, 0);
+                    let catTotalUsd = Math.round(catTotalLbp / EXCHANGE_RATE);
                     
                     // Robust case-insensitive and trimmed lookup for the logo
                     let lookupKey = catName.trim().toLowerCase();
@@ -248,11 +251,12 @@
 
                     let itemsHtml = "";
                     catItems.forEach(item => {
+                        let itemUsd = item.line_total / EXCHANGE_RATE;
                         itemsHtml += `
                             <tr>
                                 <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
                                 <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
-                                <td style="text-align: right; border: none; padding: 2px 0;">$${item.line_total.toFixed(2)}</td>
+                                <td style="text-align: right; border: none; padding: 2px 0;">$${itemUsd.toFixed(2)}</td>
                             </tr>`;
                     });
 
@@ -277,7 +281,7 @@
                         </table>
                         <hr style="border: dashed 1px #000; margin: 5px 0;">
                         <div style="text-align: right; font-weight: bold; font-size: 20px;">
-                            Total: $${catTotal.toFixed(2)}
+                            Total: $${(catTotalLbp / EXCHANGE_RATE).toFixed(2)}
                         </div>
                         <div style="text-align: right; font-weight: bold; font-size: 20px;">
                             Total LBP: ${catTotalLbp.toLocaleString()} LBP

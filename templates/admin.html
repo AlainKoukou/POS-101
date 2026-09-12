@@ -161,7 +161,7 @@
 
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Price ($ USD)</label>
-                    <input type="number" step="0.01" name="price" placeholder="e.g. 10.00">
+                    <input type="number" step="0.01" name="price_usd" placeholder="e.g. 10.00">
                 </div>
 
                 <div class="form-group" style="margin-bottom:0;">
@@ -191,8 +191,8 @@
                     <td>{{ item.name }}</td>
                     <td>{{ item.category_name }}</td>
                     <td>
-                        ${{ "%.2f"|format(item.price) }} 
-                        <br><small style="color: gray;">({{ "%.0f"|format(item.price * 90000) }} LBP)</small>
+                        ${{ "%.2f"|format(item.price / 90000) }} 
+                        <br><small style="color: gray;">({{ "%.0f"|format(item.price) }} LBP)</small>
                     </td>
 
                     <td>
@@ -206,8 +206,8 @@
                         <form action="/update_price" method="POST" enctype="multipart/form-data"
                             style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <input type="hidden" name="name" value="{{ item.name }}">
-                            <input type="number" step="any" name="new_price" placeholder="USD" style="width: 80px;">
                             <input type="number" step="any" name="new_price_lbp" placeholder="LBP" style="width: 90px;">
+                            <input type="number" step="any" name="new_price" placeholder="USD" style="width: 80px;">
                             <button type="submit" class="btn" style="background-color: #007bff; color: white;">Update</button>
                         </form>
                     </td>
