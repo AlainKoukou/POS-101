@@ -473,6 +473,7 @@ def daily_report():
     return render_template(
         "daily_report.html", 
         report_items=report_items, 
+        grand_total=grand_total_usd,
         grand_total_lbp=grand_total_lbp,
         grand_total_usd=grand_total_usd, 
         church_total=church_total,

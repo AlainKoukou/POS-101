@@ -115,9 +115,7 @@
             {% endfor %}
         };
 
-        function addItem(name, price, category) {
-            let existingItem = cart.find(item => item.name === name);
-
+        
             if (existingItem) {
                 existingItem.quantity += 1;
                 existingItem.line_total = existingItem.quantity * existingItem.price;
