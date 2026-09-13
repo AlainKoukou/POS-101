@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import io
 import os
 from reportlab.lib.pagesizes import letter
@@ -358,13 +359,14 @@ def checkout():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    local_sale_time = datetime.now(ZoneInfo("Asia/Beirut"))
     cursor.execute(
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
         VALUES (%s, %s, NOW())
         RETURNING sale_id, sale_datetime
     """,
-        (cashier, total),
+        (cashier, total,local_sale_time),
     )
     
     sale_row = cursor.fetchone()
@@ -499,12 +501,13 @@ def void_page():
         sale_item_id = request.form.get("sale_item_id")
 
         if sale_item_id:
+            local_void_time = datetime.now(ZoneInfo("Asia/Beirut"))
             cursor.execute(
                 """
                 INSERT INTO void_items (sale_item_id, void_datetime)
-                VALUES (%s, NOW())
+                VALUES (%s, %s)
             """,
-                [sale_item_id]
+                (sale_item_id, local_void_time)
             )
             conn.commit()
 
@@ -907,13 +910,14 @@ def void_item_admin():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        local_void_time = datetime.now(ZoneInfo("Asia/Beirut"))
         cursor.execute(
             """
             INSERT INTO void_items (sale_item_id, void_datetime)
-            VALUES (%s, NOW())
+            VALUES (%s, %s)
             ON CONFLICT DO NOTHING
             """,
-            (sale_item_id,)
+            (sale_item_id, local_void_time)
         )
         conn.commit()
         cursor.close()
