@@ -1,21 +1,30 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import io
 import os
+import logging
+import json
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from io import BytesIO
 from flask import Flask, render_template, request, redirect, session, jsonify, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import sqlite3
 from werkzeug.utils import secure_filename
 
+# Configure professional logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
+app.secret_key = os.environ.get("SECRET_KEY", "your_secret_key_here")
+
+# Secure cookies for production (Render handles HTTPS)
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RENDER") is not None
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 app.jinja_env.filters['ord'] = ord
 
 UPLOAD_FOLDER = "static/uploads"
@@ -24,11 +33,9 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 def get_db_connection():
     database_url = os.environ.get("DATABASE_URL")
     if database_url:
-        # Connect to Supabase PostgreSQL in production
         conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
         return conn
     else:
-        # Fallback to local SQLite for local testing
         conn = sqlite3.connect("pos.db")
         conn.row_factory = sqlite3.Row
         return conn
@@ -78,6 +85,7 @@ def login():
             return redirect("/")
         else:
             return render_template("login.html", error="Invalid credentials")
+            
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT username FROM users ORDER BY username")
@@ -97,9 +105,7 @@ def admin():
     cursor.execute("SELECT * FROM categories")
     categories = cursor.fetchall()
 
-    cursor.execute(
-        "SELECT name, category_name, price FROM items"
-    )
+    cursor.execute("SELECT name, category_name, price FROM items")
     items = cursor.fetchall()
 
     cursor.execute("SELECT username, role FROM users")
@@ -153,8 +159,8 @@ def update_price():
             )
             conn.commit()
             cursor.close()
-    except ValueError:
-        pass
+    except ValueError as e:
+        logging.warning(f"Invalid price value provided: {e}")
     finally:
         if conn:
             conn.close()
@@ -185,7 +191,7 @@ def add_user():
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error adding user: {e}")
+        logging.error(f"Error adding user: {e}")
 
     return redirect("/admin")
 
@@ -218,7 +224,6 @@ def add_item():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         cursor.execute(
             """
             INSERT INTO items (name, category_name, price)
@@ -232,7 +237,7 @@ def add_item():
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Error adding/updating item: {e}")
+        logging.error(f"Error adding/updating item: {e}")
         return f"Error: Could not save item. {e}"
 
     return redirect("/admin")
@@ -244,22 +249,18 @@ def delete_item():
         return redirect("/login")
 
     item_name = request.form.get("name")
-
     if not item_name:
         return redirect("/admin")
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM items WHERE name = %s",
-            (item_name,)
-        )
+        cursor.execute("DELETE FROM items WHERE name = %s", (item_name,))
         conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error deleting item: {e}")
+        logging.error(f"Error deleting item: {e}")
 
     return redirect("/admin")
 
@@ -270,22 +271,18 @@ def delete_category():
         return redirect("/login")
 
     category_name = request.form.get("name")
-
     if not category_name:
         return redirect("/admin")
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM categories WHERE name = %s",
-            (category_name,)
-        )
+        cursor.execute("DELETE FROM categories WHERE name = %s", (category_name,))
         conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error deleting category: {e}")
+        logging.error(f"Error deleting category: {e}")
 
     return redirect("/admin")
 
@@ -296,22 +293,18 @@ def delete_user():
         return redirect("/login")
 
     username = request.form.get("username")
-
     if not username:
         return redirect("/admin")
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM users WHERE username = %s",
-            (username,)
-        )
+        cursor.execute("DELETE FROM users WHERE username = %s", (username,))
         conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error deleting user: {e}")
+        logging.error(f"Error deleting user: {e}")
 
     return redirect("/admin")
 
@@ -323,22 +316,18 @@ def update_user_password():
 
     username = request.form.get("username")
     new_password = request.form.get("new_password")
-
     if not username or not new_password:
         return redirect("/admin")
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE users SET password = %s WHERE username = %s",
-            (new_password, username)
-        )
+        cursor.execute("UPDATE users SET password = %s WHERE username = %s", (new_password, username))
         conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error updating password: {e}")
+        logging.error(f"Error updating password: {e}")
 
     return redirect("/admin")
 
@@ -358,12 +347,10 @@ def checkout():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
     local_sale_time = datetime.now(ZoneInfo("Asia/Beirut")).replace(tzinfo=None)
 
-    import json
     try:
-        # Call the PostgreSQL stored procedure we just created
+        # Executes atomic transaction via stored procedure (RPC)
         cursor.execute(
             """
             SELECT * FROM create_sale_transaction(%s, %s, %s, %s::jsonb)
@@ -378,10 +365,10 @@ def checkout():
 
     except Exception as e:
         conn.rollback()
-        conn.close()
+        logging.error(f"Checkout transaction failed: {e}")
         return jsonify({"message": f"Checkout failed: {str(e)}"}), 500
-
-    conn.close()
+    finally:
+        conn.close()
 
     return jsonify({
         "message": "Checkout successful!",
@@ -436,28 +423,6 @@ def daily_report():
         )
         GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
     """, (start_dt, end_dt))
-    aggregated_items = cursor.fetchall()
-    
-    grand_total_lbp = sum(int(item["line_total"]) for item in report_items) if report_items else 0
-    grand_total_usd = grand_total_lbp / 90000.0
-
-    cursor.execute("""
-        SELECT 
-            COALESCE(i.category_name, 'Uncategorized') as category_name,
-            COALESCE(c.is_church_report, TRUE) as is_church_report,
-            si.item_name, 
-            SUM(si.line_total) as total_sales, 
-            SUM(si.quantity) as total_qty
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.sale_id
-        LEFT JOIN items i ON si.item_name = i.name
-        LEFT JOIN categories c ON i.category_name = c.name
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
-        AND si.sale_item_id NOT IN (
-            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
-        )
-        GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
-    """)
     aggregated_items = cursor.fetchall()
 
     item_summary_by_category = {}
@@ -523,7 +488,6 @@ def void_page():
 
     if request.method == "POST":
         sale_item_id = request.form.get("sale_item_id")
-
         if sale_item_id:
             local_void_time = datetime.now(ZoneInfo("Asia/Beirut"))
             cursor.execute(
@@ -556,9 +520,7 @@ def void_page():
     params = []
 
     if search_query:
-        query += """ AND (
-            CAST(s.sale_id AS TEXT) ILIKE %s
-        )"""
+        query += " AND (CAST(s.sale_id AS TEXT) ILIKE %s)"
         params.append(f"%{search_query}%")
     if selected_category:
         query += " AND i.category_name = %s"
@@ -589,16 +551,14 @@ def reset_today():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         cursor.execute("DELETE FROM void_items")
         cursor.execute("DELETE FROM sale_items")
         cursor.execute("DELETE FROM sales")
-        
         conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error resetting today's sales: {e}")
+        logging.error(f"Error resetting sales records: {e}")
 
     return redirect("/daily_report")
 
@@ -613,7 +573,6 @@ def add_category():
         return redirect("/admin")
 
     is_church_report = True if request.form.get("is_church_report") == "true" else False
-
     logo_filename = None
     file = request.files.get("logo")
 
@@ -639,13 +598,11 @@ def add_category():
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"CRITICAL ERROR adding category: {e}")
+        logging.error(f"Error adding category: {e}")
         raise e
 
     return redirect("/admin")
 
-
-# REPLACE your /download_report function in app.py with this updated version:
 
 @app.route("/download_report")
 def download_report():
@@ -699,20 +656,6 @@ def download_report():
     """, (start_dt, end_dt))
     report_items = cursor.fetchall()
 
-    cursor.execute("""
-        SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name,
-               COALESCE(c.is_church_report, TRUE) as is_church_report
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.sale_id
-        LEFT JOIN items i ON si.item_name = i.name
-        LEFT JOIN categories c ON i.category_name = c.name
-        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
-        AND si.sale_item_id NOT IN (
-            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
-        )
-    """, (target_date,))
-    report_items = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
@@ -762,23 +705,15 @@ def download_report():
     elements.append(Paragraph(f"Report Date: {target_date.strftime('%d-%m-%Y')}{report_title_suffix}", styles['Normal']))
     elements.append(Spacer(1, 15))
 
-    # --- Per-Cashier Summary Section ---
+    # Per-Cashier Summary Section
     elements.append(Paragraph("<b>Per-Cashier Summary</b>", styles['Heading3']))
     cashier_table_data = [["Cashier Name", "Total Items Sold", "Total Sales"]]
     if cashier_summary_dict:
         for cashier, data in cashier_summary_dict.items():
             c_lbp = data['sales_lbp']
             c_usd = c_lbp / 90000.0
-            cashier_table_data.append([
-                cashier,
-                str(data['qty']),
-                f"${c_usd:.2f} ({c_lbp:,.0f} LBP)"
-            ])
-        cashier_table_data.append([
-            "Total",
-            str(total_cashier_qty),
-            f"${grand_usd:.2f} ({grand_lbp:,.0f} LBP)"
-        ])
+            cashier_table_data.append([cashier, str(data['qty']), f"${c_usd:.2f} ({c_lbp:,.0f} LBP)"])
+        cashier_table_data.append(["Total", str(total_cashier_qty), f"${grand_usd:.2f} ({grand_lbp:,.0f} LBP)"])
     else:
         cashier_table_data.append(["No sales recorded for this selection.", "", ""])
 
@@ -800,19 +735,14 @@ def download_report():
     elements.append(t_cashier)
     elements.append(Spacer(1, 20))
 
-    # --- Church Sales Section ---
+    # Church Sales Section
     elements.append(Paragraph(f"<b>Church Sales — Subtotal: ${church_usd:.2f} ({church_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
-    
     church_table_data = [["Item Name", "Qty", "Sales Total"]]
     if church_items:
         for ci in church_items:
             ci_lbp = int(ci['total_sales'])
             ci_usd = ci_lbp / 90000.0
-            church_table_data.append([
-                ci['item_name'], 
-                str(ci['total_qty']), 
-                f"${ci_usd:.2f} ({ci_lbp:,.0f} LBP)"
-            ])
+            church_table_data.append([ci['item_name'], str(ci['total_qty']), f"${ci_usd:.2f} ({ci_lbp:,.0f} LBP)"])
     else:
         church_table_data.append(["No church sales for this date.", "", ""])
 
@@ -831,21 +761,16 @@ def download_report():
     ]))
     elements.append(t_church)
 
-    # --- Kbar Sales Section (Conditionally Rendered) ---
+    # Kbar Sales Section
     if include_kbar:
         elements.append(Spacer(1, 15))
         elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_usd:.2f} ({kbar_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
-        
         kbar_table_data = [["Item Name", "Qty", "Sales Total"]]
         if kbar_items:
             for ki in kbar_items:
                 ki_lbp = int(ki['total_sales'])
                 ki_usd = ki_lbp / 90000.0
-                kbar_table_data.append([
-                    ki['item_name'], 
-                    str(ki['total_qty']), 
-                    f"${ki_usd:.2f} ({ki_lbp:,.0f} LBP)"
-                ])
+                kbar_table_data.append([ki['item_name'], str(ki['total_qty']), f"${ki_usd:.2f} ({ki_lbp:,.0f} LBP)"])
         else:
             kbar_table_data.append(["No Kbar sales for this date.", "", ""])
 
@@ -885,6 +810,8 @@ def download_report():
         download_name=f"daily_report_{target_date.strftime('%Y-%m-%d')}_{file_suffix}.pdf", 
         mimetype='application/pdf'
     )
+
+
 @app.route("/api/get_orders")
 def get_orders():
     if "role" not in session or session["role"] != "admin":
@@ -924,7 +851,6 @@ def get_orders():
     cursor.close()
     conn.close()
 
-    # Convert RealDictRows / sqlite3 rows into a standard serializable list of dicts
     result = []
     for item in items:
         result.append({
@@ -947,7 +873,6 @@ def void_item_admin():
 
     data = request.get_json()
     sale_item_id = data.get("sale_item_id")
-
     if not sale_item_id:
         return jsonify({"success": False, "error": "Missing sale_item_id"}), 400
 
@@ -964,15 +889,16 @@ def void_item_admin():
             (sale_item_id, local_void_time)
         )
         conn.commit()
-        cursor.close()
-        conn.close()
         return jsonify({"success": True})
     except Exception as e:
         conn.rollback()
+        logging.error(f"Error voiding item: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"success": False, "error": str(e)}), 500
-    
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
