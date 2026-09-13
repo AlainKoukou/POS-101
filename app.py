@@ -359,7 +359,7 @@ def checkout():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    local_sale_time = datetime.now(ZoneInfo("Asia/Beirut"))
+    local_sale_time = datetime.now(ZoneInfo("Asia/Beirut")).replace(tzinfo=None)
     cursor.execute(
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
