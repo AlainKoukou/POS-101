@@ -618,13 +618,16 @@ def add_category():
     return redirect("/admin")
 
 
+# REPLACE your /download_report function in app.py with this updated version:
+
 @app.route("/download_report")
 def download_report():
     if "role" not in session or session["role"] != "admin":
         return redirect("/login")
 
-    # Get the target date from query parameters; fallback to current date if missing
     target_date_str = request.args.get("date", datetime.now().strftime("%Y-%m-%d"))
+    include_kbar = request.args.get("include_kbar", "true").lower() == "true"
+
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -653,9 +656,12 @@ def download_report():
     aggregated_items = cursor.fetchall()
 
     cursor.execute("""
-        SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
+        SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name,
+               COALESCE(c.is_church_report, TRUE) as is_church_report
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        LEFT JOIN categories c ON i.category_name = c.name
         WHERE DATE(s.sale_datetime) = %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
@@ -677,17 +683,20 @@ def download_report():
             church_items.append(item)
             church_total_lbp += sale_val_lbp
         else:
-            kbar_items.append(item)
-            kbar_total_lbp += sale_val_lbp
+            if include_kbar:
+                kbar_items.append(item)
+                kbar_total_lbp += sale_val_lbp
 
-    grand_lbp = church_total_lbp + kbar_total_lbp
+    grand_lbp = church_total_lbp + (kbar_total_lbp if include_kbar else 0.0)
     grand_usd = grand_lbp / 90000.0
     church_usd = church_total_lbp / 90000.0
-    kbar_usd = kbar_total_lbp / 90000.0
+    kbar_usd = kbar_total_lbp / 90000.0 if include_kbar else 0.0
 
     cashier_summary_dict = {}
     total_cashier_qty = 0
     for item in report_items:
+        if not include_kbar and not item["is_church_report"]:
+            continue
         cashier = item["cashier_name"]
         if cashier not in cashier_summary_dict:
             cashier_summary_dict[cashier] = {"qty": 0, "sales_lbp": 0}
@@ -695,19 +704,18 @@ def download_report():
         cashier_summary_dict[cashier]["sales_lbp"] += int(item["line_total"])
         total_cashier_qty += int(item["quantity"])
 
-    # Generate PDF using ReportLab
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     elements = []
     styles = getSampleStyleSheet()
 
     primary_color = colors.HexColor('#1f6feb')
-    dark_neutral = colors.HexColor('#111827')
     light_bg = colors.HexColor('#f3f4f6')
     border_color = colors.HexColor('#dcdcdc')
 
     elements.append(Paragraph("Daily Sales Report", styles['Title']))
-    elements.append(Paragraph(f"Report Date: {target_date.strftime('%d-%m-%Y')}", styles['Normal']))
+    report_title_suffix = " (Church Only)" if not include_kbar else ""
+    elements.append(Paragraph(f"Report Date: {target_date.strftime('%d-%m-%Y')}{report_title_suffix}", styles['Normal']))
     elements.append(Spacer(1, 15))
 
     # --- Per-Cashier Summary Section ---
@@ -728,7 +736,7 @@ def download_report():
             f"${grand_usd:.2f} ({grand_lbp:,.0f} LBP)"
         ])
     else:
-        cashier_table_data.append(["No sales recorded for this date.", "", ""])
+        cashier_table_data.append(["No sales recorded for this selection.", "", ""])
 
     t_cashier = Table(cashier_table_data, colWidths=[200, 100, 240])
     t_cashier.setStyle(TableStyle([
@@ -778,38 +786,39 @@ def download_report():
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     elements.append(t_church)
-    elements.append(Spacer(1, 15))
 
-    # --- Kbar Sales Section ---
-    elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_usd:.2f} ({kbar_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
-    
-    kbar_table_data = [["Item Name", "Qty", "Sales Total"]]
-    if kbar_items:
-        for ki in kbar_items:
-            ki_lbp = int(ki['total_sales'])
-            ki_usd = ki_lbp / 90000.0
-            kbar_table_data.append([
-                ki['item_name'], 
-                str(ki['total_qty']), 
-                f"${ki_usd:.2f} ({ki_lbp:,.0f} LBP)"
-            ])
-    else:
-        kbar_table_data.append(["No Kbar sales for this date.", "", ""])
+    # --- Kbar Sales Section (Conditionally Rendered) ---
+    if include_kbar:
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_usd:.2f} ({kbar_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
+        
+        kbar_table_data = [["Item Name", "Qty", "Sales Total"]]
+        if kbar_items:
+            for ki in kbar_items:
+                ki_lbp = int(ki['total_sales'])
+                ki_usd = ki_lbp / 90000.0
+                kbar_table_data.append([
+                    ki['item_name'], 
+                    str(ki['total_qty']), 
+                    f"${ki_usd:.2f} ({ki_lbp:,.0f} LBP)"
+                ])
+        else:
+            kbar_table_data.append(["No Kbar sales for this date.", "", ""])
 
-    t_kbar = Table(kbar_table_data, colWidths=[250, 80, 210])
-    t_kbar.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), primary_color),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BOTTOMPADDING', (0,0), (-1,0), 8),
-        ('TOPPADDING', (0,0), (-1,0), 8),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, light_bg]),
-        ('GRID', (0,0), (-1,-1), 0.5, border_color),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    elements.append(t_kbar)
+        t_kbar = Table(kbar_table_data, colWidths=[250, 80, 210])
+        t_kbar.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), primary_color),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('BOTTOMPADDING', (0,0), (-1,0), 8),
+            ('TOPPADDING', (0,0), (-1,0), 8),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, light_bg]),
+            ('GRID', (0,0), (-1,-1), 0.5, border_color),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        elements.append(t_kbar)
 
     sig_style = ParagraphStyle(
         'DeveloperSignature',
@@ -824,10 +833,12 @@ def download_report():
     
     doc.build(elements)
     buffer.seek(0)
+    
+    file_suffix = "church_only" if not include_kbar else "full"
     return send_file(
         buffer, 
         as_attachment=True, 
-        download_name=f"daily_report_{target_date.strftime('%Y-%m-%d')}.pdf", 
+        download_name=f"daily_report_{target_date.strftime('%Y-%m-%d')}_{file_suffix}.pdf", 
         mimetype='application/pdf'
     )
 
