@@ -359,32 +359,28 @@ def checkout():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Generate local naive timestamp for Beirut to avoid driver/type mismatches
     local_sale_time = datetime.now(ZoneInfo("Asia/Beirut")).replace(tzinfo=None)
 
-    cursor.execute(
-        """
-        INSERT INTO sales (cashier_name, total_amount, sale_datetime)
-        VALUES (%s, %s, %s)
-        RETURNING sale_id, sale_datetime
-    """,
-        (cashier, total, local_sale_time),
-    )
-    
-    sale_row = cursor.fetchone()
-    sale_id = sale_row["sale_id"] if sale_row else None
-    sale_datetime = str(sale_row["sale_datetime"]) if sale_row else local_sale_time.strftime("%Y-%m-%d %H:%M:%S")
-
-    for item in cart:
+    import json
+    try:
+        # Call the PostgreSQL stored procedure we just created
         cursor.execute(
             """
-            INSERT INTO sale_items (sale_id, item_name, quantity, line_total)
-            VALUES (%s, %s, %s, %s)
-        """,
-            (sale_id, item["name"], item["quantity"], int(item["line_total"])),
+            SELECT * FROM create_sale_transaction(%s, %s, %s, %s::jsonb)
+            """,
+            (cashier, total, local_sale_time, json.dumps(cart))
         )
+        sale_row = cursor.fetchone()
+        conn.commit()
+        
+        sale_id = sale_row["new_sale_id"] if sale_row else None
+        sale_datetime = str(sale_row["new_sale_datetime"]) if sale_row else local_sale_time.strftime("%Y-%m-%d %H:%M:%S")
 
-    conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"message": f"Checkout failed: {str(e)}"}), 500
+
     conn.close()
 
     return jsonify({
