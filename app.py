@@ -398,6 +398,10 @@ def daily_report():
     if "role" not in session or session["role"] != "admin":
         return redirect("/login")
 
+    target_date = datetime.now(ZoneInfo("Asia/Beirut")).date()
+    start_dt = datetime.combine(target_date, datetime.min.time())
+    end_dt = start_dt + timedelta(days=1)
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -405,12 +409,34 @@ def daily_report():
         SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
-    """)
+    """, (start_dt, end_dt))
     report_items = cursor.fetchall()
+    
+    grand_total_lbp = sum(int(item["line_total"]) for item in report_items) if report_items else 0
+    grand_total_usd = grand_total_lbp / 90000.0
+
+    cursor.execute("""
+        SELECT 
+            COALESCE(i.category_name, 'Uncategorized') as category_name,
+            COALESCE(c.is_church_report, TRUE) as is_church_report,
+            si.item_name, 
+            SUM(si.line_total) as total_sales, 
+            SUM(si.quantity) as total_qty
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        LEFT JOIN categories c ON i.category_name = c.name
+        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+        GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
+    """, (start_dt, end_dt))
+    aggregated_items = cursor.fetchall()
     
     grand_total_lbp = sum(int(item["line_total"]) for item in report_items) if report_items else 0
     grand_total_usd = grand_total_lbp / 90000.0
@@ -634,6 +660,9 @@ def download_report():
     except ValueError:
         target_date = datetime.now().date()
 
+    start_dt = datetime.combine(target_date, datetime.min.time())
+    end_dt = start_dt + timedelta(days=1)
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -648,12 +677,12 @@ def download_report():
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
         LEFT JOIN categories c ON i.category_name = c.name
-        WHERE DATE(s.sale_datetime) = %s
+        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
         GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
-    """, (target_date,))
+    """, (start_dt, end_dt))
     aggregated_items = cursor.fetchall()
 
     cursor.execute("""
@@ -663,7 +692,21 @@ def download_report():
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
         LEFT JOIN categories c ON i.category_name = c.name
-        WHERE DATE(s.sale_datetime) = %s
+        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+    """, (start_dt, end_dt))
+    report_items = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name,
+               COALESCE(c.is_church_report, TRUE) as is_church_report
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        LEFT JOIN categories c ON i.category_name = c.name
+        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
@@ -853,6 +896,9 @@ def get_orders():
     except ValueError:
         target_date = datetime.now().date()
 
+    start_dt = datetime.combine(target_date, datetime.min.time())
+    end_dt = start_dt + timedelta(days=1)
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -868,12 +914,12 @@ def get_orders():
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
-        WHERE DATE(s.sale_datetime) = %s
+        WHERE s.sale_datetime >= %s AND s.sale_datetime < %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
         ORDER BY s.sale_datetime DESC
-    """, (target_date,))
+    """, (start_dt, end_dt))
     items = cursor.fetchall()
     cursor.close()
     conn.close()
