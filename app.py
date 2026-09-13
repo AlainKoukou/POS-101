@@ -359,19 +359,21 @@ def checkout():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Generate local naive timestamp for Beirut to avoid driver/type mismatches
     local_sale_time = datetime.now(ZoneInfo("Asia/Beirut")).replace(tzinfo=None)
+
     cursor.execute(
         """
         INSERT INTO sales (cashier_name, total_amount, sale_datetime)
-        VALUES (%s, %s, NOW())
+        VALUES (%s, %s, %s)
         RETURNING sale_id, sale_datetime
     """,
-        (cashier, total,local_sale_time),
+        (cashier, total, local_sale_time),
     )
     
     sale_row = cursor.fetchone()
     sale_id = sale_row["sale_id"] if sale_row else None
-    sale_datetime = str(sale_row["sale_datetime"]) if sale_row else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sale_datetime = str(sale_row["sale_datetime"]) if sale_row else local_sale_time.strftime("%Y-%m-%d %H:%M:%S")
 
     for item in cart:
         cursor.execute(
