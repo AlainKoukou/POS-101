@@ -841,7 +841,90 @@ def download_report():
         download_name=f"daily_report_{target_date.strftime('%Y-%m-%d')}_{file_suffix}.pdf", 
         mimetype='application/pdf'
     )
+@app.route("/api/get_orders")
+def get_orders():
+    if "role" not in session or session["role"] != "admin":
+        return jsonify([]), 403
 
+    target_date_str = request.args.get("date", datetime.now().strftime("%Y-%m-%d"))
+    try:
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        target_date = datetime.now().date()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT 
+            si.sale_item_id,
+            si.sale_id,
+            s.sale_datetime,
+            s.cashier_name,
+            COALESCE(i.category_name, 'Uncategorized') as category_name,
+            si.item_name,
+            si.quantity,
+            si.line_total
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.sale_id
+        LEFT JOIN items i ON si.item_name = i.name
+        WHERE DATE(s.sale_datetime) = %s
+        AND si.sale_item_id NOT IN (
+            SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
+        )
+        ORDER BY s.sale_datetime DESC
+    """, (target_date,))
+    items = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    # Convert RealDictRows / sqlite3 rows into a standard serializable list of dicts
+    result = []
+    for item in items:
+        result.append({
+            "sale_item_id": str(item["sale_item_id"]),
+            "sale_id": item["sale_id"],
+            "sale_datetime": str(item["sale_datetime"]),
+            "cashier_name": item["cashier_name"],
+            "category_name": item["category_name"],
+            "item_name": item["item_name"],
+            "quantity": item["quantity"],
+            "line_total": int(item["line_total"])
+        })
+    return jsonify(result)
+
+
+@app.route("/void_item_admin", methods=["POST"])
+def void_item_admin():
+    if "role" not in session or session["role"] != "admin":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    data = request.get_json()
+    sale_item_id = data.get("sale_item_id")
+
+    if not sale_item_id:
+        return jsonify({"success": False, "error": "Missing sale_item_id"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO void_items (sale_item_id, void_datetime)
+            VALUES (%s, NOW())
+            ON CONFLICT DO NOTHING
+            """,
+            (sale_item_id,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "error": str(e)}), 500
+    
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

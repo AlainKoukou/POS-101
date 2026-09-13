@@ -4,6 +4,12 @@
 <head>
     <title>Daily Sales Report</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .btn-red { background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-red:hover { background-color: #bd2130; }
+        .btn-blue { background-color: #1f6feb; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-blue:hover { background-color: #1158c7; }
+    </style>
 </head>
 
 <body>
@@ -22,22 +28,81 @@
         <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
             <div>
                 <h1>Daily Sales Report</h1>
-                <p>Detailed summary of selected date transactions.</p>
+                <p>Detailed summary of selected date transactions & order manager.</p>
             </div>
-            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <input type="date" id="report-date" style="padding: 9px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;" />
                 <label style="display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; user-select: none;">
                     <input type="checkbox" id="include-kbar" checked style="width: 16px; height: 16px; cursor: pointer;" /> Include Kbar
                 </label>
+                <button onclick="loadOrders()" class="btn-blue">Load Orders</button>
                 <button onclick="downloadCustomReport()" class="btn" style="background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Download PDF</button>
                 <form action="/reset_today" method="POST" onsubmit="return confirm('Are you sure you want to reset all of today sales? This cannot be undone.');" style="margin: 0;">
-                    <button type="submit" class="btn" style="background-color: #dc3545; color: white;">Reset Today Report</button>
+                    <button type="submit" class="btn" style="background-color: #dc3545; color: white; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Reset Today Report</button>
                 </form>
             </div>
         </div>
 
         <script>
             document.getElementById('report-date').valueAsDate = new Date();
+
+            // Auto-load orders for today when page opens
+            window.addEventListener('DOMContentLoaded', () => {
+                loadOrders();
+            });
+
+            async function loadOrders() {
+                const selectedDate = document.getElementById('report-date').value;
+                if (!selectedDate) {
+                    alert("Please select a date first.");
+                    return;
+                }
+
+                const response = await fetch(`/api/get_orders?date=${selectedDate}`);
+                const items = await response.json();
+                
+                const tbody = document.getElementById('orders-table-body');
+                tbody.innerHTML = "";
+
+                if (items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: gray;">No active orders found for this date.</td></tr>`;
+                    return;
+                }
+
+                items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const timeStr = new Date(item.sale_datetime).toLocaleTimeString();
+                    const usdVal = (item.line_total / 90000.0).toFixed(2);
+                    
+                    tr.innerHTML = `
+                        <td>${timeStr}</td>
+                        <td><strong>${item.cashier_name}</strong></td>
+                        <td>${item.item_name}</td>
+                        <td>${item.category_name}</td>
+                        <td>${item.quantity}</td>
+                        <td>$${usdVal} <small style="color: gray;">(${item.line_total.toLocaleString()} LBP)</small></td>
+                        <td><button onclick="voidItem('${item.sale_item_id}')" class="btn-red">Void</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            async function voidItem(saleItemId) {
+                if (!confirm("Are you sure you want to void this item? It will be removed from totals.")) return;
+
+                const response = await fetch('/void_item_admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sale_item_id: saleItemId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadOrders(); // Refresh table instantly
+                } else {
+                    alert("Error voiding item: " + (result.error || "Unknown error"));
+                }
+            }
 
             function downloadCustomReport() {
                 const selectedDate = document.getElementById('report-date').value;
@@ -73,6 +138,28 @@
                 <h3>Voided Entries</h3>
                 <h2 style="color: #dc3545; margin: 5px 0;">{{ voided_items|length }}</h2>
             </div>
+        </div>
+
+        <!-- Orders Timeline & Void Panel (Review & Void Pre-6PM Items) -->
+        <div class="card">
+            <h2>Orders Timeline & Void Manager</h2>
+            <p style="color: gray; font-size: 13px;">Review all items recorded for the chosen date. Click <strong>Void</strong> on any item (such as those before 6:00 PM) to remove it immediately.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Cashier</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Qty</th>
+                        <th>Total</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                    <tr><td colspan="7" style="text-align: center;">Loading orders...</td></tr>
+                </tbody>
+            </table>
         </div>
 
         <!-- Detailed Breakdown by Category -->
