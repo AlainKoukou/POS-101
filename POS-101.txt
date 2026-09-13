@@ -1,7 +1,7 @@
 POS-101
 
 Cashier_1       cashier_1
-Alain           alain140104
+Alain           alain104140
 
 render domain:
 
