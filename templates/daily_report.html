@@ -22,15 +22,30 @@
         <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
             <div>
                 <h1>Daily Sales Report</h1>
-                <p>Detailed summary of today's transactions.</p>
+                <p>Detailed summary of selected date transactions.</p>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <a href="/download_report" class="btn" style="background-color: #28a745; color: white; text-decoration: none; padding: 10px 15px; border-radius: 4px; display:inline-block;">Download PDF</a>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="date" id="report-date" style="padding: 9px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;" />
+                <button onclick="downloadCustomReport()" class="btn" style="background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Download PDF</button>
                 <form action="/reset_today" method="POST" onsubmit="return confirm('Are you sure you want to reset all of today sales? This cannot be undone.');" style="margin: 0;">
                     <button type="submit" class="btn" style="background-color: #dc3545; color: white;">Reset Today Report</button>
                 </form>
             </div>
         </div>
+
+        <script>
+            // Initialize date picker to today's date
+            document.getElementById('report-date').valueAsDate = new Date();
+
+            function downloadCustomReport() {
+                const selectedDate = document.getElementById('report-date').value;
+                if (!selectedDate) {
+                    alert("Please select a date first.");
+                    return;
+                }
+                window.location.href = `/download_report?date=${selectedDate}`;
+            }
+        </script>
 
         <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
             <div class="card" style="flex: 1; min-width: 220px; margin-bottom: 0;">

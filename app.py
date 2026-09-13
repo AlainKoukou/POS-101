@@ -623,9 +623,15 @@ def download_report():
     if "role" not in session or session["role"] != "admin":
         return redirect("/login")
 
+    # Get the target date from query parameters; fallback to current date if missing
+    target_date_str = request.args.get("date", datetime.now().strftime("%Y-%m-%d"))
+    try:
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        target_date = datetime.now().date()
+
     conn = get_db_connection()
     cursor = conn.cursor()
-
 
     cursor.execute("""
         SELECT 
@@ -638,22 +644,23 @@ def download_report():
         JOIN sales s ON si.sale_id = s.sale_id
         LEFT JOIN items i ON si.item_name = i.name
         LEFT JOIN categories c ON i.category_name = c.name
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        WHERE DATE(s.sale_datetime) = %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
         GROUP BY COALESCE(i.category_name, 'Uncategorized'), COALESCE(c.is_church_report, TRUE), si.item_name
-    """)
+    """, (target_date,))
     aggregated_items = cursor.fetchall()
+
     cursor.execute("""
         SELECT si.sale_id, si.sale_item_id, si.item_name, si.quantity, si.line_total, s.sale_datetime, s.cashier_name
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.sale_id
-        WHERE DATE(s.sale_datetime) = CURRENT_DATE
+        WHERE DATE(s.sale_datetime) = %s
         AND si.sale_item_id NOT IN (
             SELECT sale_item_id FROM void_items WHERE sale_item_id IS NOT NULL
         )
-    """)
+    """, (target_date,))
     report_items = cursor.fetchall()
 
     cursor.close()
@@ -688,7 +695,6 @@ def download_report():
         cashier_summary_dict[cashier]["sales_lbp"] += int(item["line_total"])
         total_cashier_qty += int(item["quantity"])
 
-
     # Generate PDF using ReportLab
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -700,19 +706,9 @@ def download_report():
     light_bg = colors.HexColor('#f3f4f6')
     border_color = colors.HexColor('#dcdcdc')
 
-    title_style = ParagraphStyle(
-        'ReportTitle',
-        parent=styles['Title'],
-        textColor=dark_neutral,
-        fontSize=24,
-        alignment=0,
-        spaceAfter=4
-    )   
-    
     elements.append(Paragraph("Daily Sales Report", styles['Title']))
-    elements.append(Paragraph(f"Report Date: {datetime.now().strftime('%d-%m-%Y')}", styles['Normal']))
+    elements.append(Paragraph(f"Report Date: {target_date.strftime('%d-%m-%Y')}", styles['Normal']))
     elements.append(Spacer(1, 15))
-    
 
     # --- Per-Cashier Summary Section ---
     elements.append(Paragraph("<b>Per-Cashier Summary</b>", styles['Heading3']))
@@ -732,7 +728,7 @@ def download_report():
             f"${grand_usd:.2f} ({grand_lbp:,.0f} LBP)"
         ])
     else:
-        cashier_table_data.append(["No sales recorded today.", "", ""])
+        cashier_table_data.append(["No sales recorded for this date.", "", ""])
 
     t_cashier = Table(cashier_table_data, colWidths=[200, 100, 240])
     t_cashier.setStyle(TableStyle([
@@ -766,12 +762,12 @@ def download_report():
                 f"${ci_usd:.2f} ({ci_lbp:,.0f} LBP)"
             ])
     else:
-        church_table_data.append(["No church sales today.", "", ""])
+        church_table_data.append(["No church sales for this date.", "", ""])
 
     t_church = Table(church_table_data, colWidths=[250, 80, 210])
     t_church.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), primary_color),
-        ('TEXTCOLOR', (0,0), (-1,0),colors.whitesmoke),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('FONTSIZE', (0,0), (-1,0), 10),
@@ -785,7 +781,6 @@ def download_report():
     elements.append(Spacer(1, 15))
 
     # --- Kbar Sales Section ---
-
     elements.append(Paragraph(f"<b>Kbar Sales — Subtotal: ${kbar_usd:.2f} ({kbar_total_lbp:,.0f} LBP)</b>", styles['Heading3']))
     
     kbar_table_data = [["Item Name", "Qty", "Sales Total"]]
@@ -799,7 +794,7 @@ def download_report():
                 f"${ki_usd:.2f} ({ki_lbp:,.0f} LBP)"
             ])
     else:
-        kbar_table_data.append(["No Kbar sales today.", "", ""])
+        kbar_table_data.append(["No Kbar sales for this date.", "", ""])
 
     t_kbar = Table(kbar_table_data, colWidths=[250, 80, 210])
     t_kbar.setStyle(TableStyle([
@@ -816,13 +811,12 @@ def download_report():
     ]))
     elements.append(t_kbar)
 
-    
     sig_style = ParagraphStyle(
         'DeveloperSignature',
         parent=styles['Normal'],
         textColor=colors.HexColor('#6c757d'),
         fontSize=9,
-        alignment=2  # Right-aligned
+        alignment=2
     )
 
     elements.append(Spacer(1, 20))
@@ -830,7 +824,12 @@ def download_report():
     
     doc.build(elements)
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name=f"daily_report_{datetime.now().strftime('%Y-%m-%d')}.pdf", mimetype='application/pdf')
+    return send_file(
+        buffer, 
+        as_attachment=True, 
+        download_name=f"daily_report_{target_date.strftime('%Y-%m-%d')}.pdf", 
+        mimetype='application/pdf'
+    )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
