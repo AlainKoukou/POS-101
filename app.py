@@ -898,6 +898,29 @@ def void_item_admin():
         cursor.close()
         conn.close()
 
+@app.route('/api/pos-data')
+def api_pos_data():
+    # Ensure only logged-in users can fetch this
+    if 'username' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT name, category_name, price FROM items")
+    items = cursor.fetchall()
+    
+    cursor.execute("SELECT name, logo, is_church_report FROM categories")
+    categories = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    return jsonify({
+        "items": [dict(row) for row in items],
+        "categories": [dict(row) for row in categories]
+    })
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

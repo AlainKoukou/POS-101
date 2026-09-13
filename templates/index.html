@@ -65,23 +65,7 @@
 
             <div class="card" style="flex:2; min-width:320px;">
                 <h2>Items</h2>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:16px;">
-                    {% for item in items %}
-                        {% set cat = item.category_name | default('General', true) | string %}
-                        
-                        {# Compute deterministic HSL color using inline Jinja math #}
-                        {% set ns = namespace(hash=0) %}
-                        {% for char in cat %}
-                            {% set ns.hash = (ns.hash * 31 + char|ord) %}
-                        {% endfor %}
-                        {% set hue = (ns.hash | abs) % 360 %}
-                        
-                        <button style="background-color: hsl({{ hue }}, 65%, 45%) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 20px !important; cursor: pointer !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; min-width: 180px !important; min-height: 200px !important; box-sizing: border-box !important; overflow: hidden !important;" onclick='addItem({{ item.name|tojson }}, {{ item.price }}, {{ item.category_name|tojson }})'>
-                            <strong style="font-size: 24px !important; text-transform: uppercase !important; font-weight: bold !important; margin-bottom: 4px !important; word-break: break-word !important; text-align: center !important;">{{ item.name }}</strong>
-                            <span style="font-size: 1.2rem !important; font-weight: bold !important; margin-bottom: 2px !important;">${{ "%.2f"|format(item.price / 90000) }}</span>    
-                            <small style="font-size: 1.1rem !important; opacity: 0.9 !important;">{{ "%.0f"|format(item.price) }} LBP</small>
-                        </button>
-                    {% endfor %}
+                <div id="items-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:16px;">                    
                 </div>
             </div>
 
@@ -108,11 +92,61 @@
         let cart = [];
         let total = 0;
 
-        // Map categories to their uploaded logos from backend database (stored in lowercase for safe lookup)
-        const categoryLogos = {
-            {% for cat in categories %}
-            [{{ (cat.name | trim | lower) | tojson }}]: {{ (cat.logo if cat.logo else '') | tojson }},
-            {% endfor %}
+        let categoryLogos = {};
+        let itemsList = [];
+
+        // Fetch latest items and logos from the backend API
+        function loadPOSData(callback) {
+            fetch('/api/pos-data')
+                .then(response => response.json())
+                .then(data => {
+                    // Rebuild category logos map dynamically
+                    categoryLogos = {};
+                    data.categories.forEach(cat => {
+                        let key = cat.name.trim().toLowerCase();
+                        categoryLogos[key] = cat.logo || "";
+                    });
+
+                    // Update items list and re-render grid
+                    itemsList = data.items;
+                    renderItems();
+
+                    if (callback) callback();
+                })
+                .catch(err => console.error("Failed to sync POS data:", err));
+        }
+
+        // Render the buttons dynamically on the screen
+        function renderItems() {
+            let container = document.getElementById("items-grid");
+            container.innerHTML = "";
+
+            itemsList.forEach(item => {
+                let cat = item.category_name || 'General';
+                
+                // Compute deterministic HSL color
+                let hash = 0;
+                for (let i = 0; i < cat.length; i++) {
+                    hash = (hash * 31 + cat.charCodeAt(i));
+                }
+                let hue = Math.abs(hash) % 360;
+
+                let btn = document.createElement("button");
+                btn.style.cssText = `background-color: hsl(${hue}, 65%, 45%) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 20px !important; cursor: pointer !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; min-width: 180px !important; min-height: 200px !important; box-sizing: border-box !important; overflow: hidden !important;`;
+                btn.onclick = () => addItem(item.name, item.price, item.category_name);
+
+                btn.innerHTML = `
+                    <strong style="font-size: 24px !important; text-transform: uppercase !important; font-weight: bold !important; margin-bottom: 4px !important; word-break: break-word !important; text-align: center !important;">${item.name}</strong>
+                    <span style="font-size: 1.2rem !important; font-weight: bold !important; margin-bottom: 2px !important;">$${(item.price / EXCHANGE_RATE).toFixed(2)}</span>    
+                    <small style="font-size: 1.1rem !important; opacity: 0.9 !important;">${Math.round(item.price).toLocaleString()} LBP</small>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        // Automatically load data when page opens
+        window.onload = function() {
+            loadPOSData();
         };
 
         function addItem(name, price, category) {
@@ -202,116 +236,112 @@
                 return;
             }
 
-            fetch("/checkout", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    cart: cart,
-                    total: total
+            // Fetch fresh category logos right at checkout to ensure newly uploaded logos are used immediately
+            loadPOSData(() => {
+                fetch("/checkout", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        cart: cart,
+                        total: total
+                    })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                let saleId = data.sale_id;
-                let saleDate = data.sale_datetime;
-                let cashier = data.cashier;
+                .then(response => response.json())
+                .then(data => {
+                    let saleId = data.sale_id;
+                    let saleDate = data.sale_datetime;
+                    let cashier = data.cashier;
 
-                // Group cart items dynamically by category
-                let groupedByCategory = {};
-                cart.forEach(item => {
-                    let cat = item.category || "General";
-                    if (!groupedByCategory[cat]) {
-                        groupedByCategory[cat] = [];
-                    }
-                    groupedByCategory[cat].push(item);
-                });
-
-                let receiptSection = document.getElementById("receipt-section");
-                receiptSection.innerHTML = ""; // Clear previous receipts
-
-                let categories = Object.keys(groupedByCategory);
-
-                categories.forEach((catName, index) => {
-                    let catItems = groupedByCategory[catName];
-                    let catTotalLbp = catItems.reduce((sum, item) => sum + item.line_total, 0);
-                    let catTotalUsd = Math.round(catTotalLbp / EXCHANGE_RATE);
-                    
-                    // Robust case-insensitive and trimmed lookup for the logo
-                    let lookupKey = catName.trim().toLowerCase();
-                    let logoFilename = categoryLogos[lookupKey] || "";
-
-                    // Build receipt block for this specific category
-                    let receiptDiv = document.createElement("div");
-                    receiptDiv.className = "thermal-receipt";
-                    
-                    let logoHtml = logoFilename ? `<img src="/static/uploads/${logoFilename}" class="receipt-logo">` : '';
-
-                    let itemsHtml = "";
-                    catItems.forEach(item => {
-                        let itemUsd = item.line_total / EXCHANGE_RATE;
-                        itemsHtml += `
-                            <tr>
-                                <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
-                                <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
-                                <td style="text-align: right; border: none; padding: 2px 0;">$${itemUsd.toFixed(2)}</td>
-                            </tr>`;
+                    let groupedByCategory = {};
+                    cart.forEach(item => {
+                        let cat = item.category || "General";
+                        if (!groupedByCategory[cat]) {
+                            groupedByCategory[cat] = [];
+                        }
+                        groupedByCategory[cat].push(item);
                     });
 
-                    receiptDiv.innerHTML = `
-                        ${logoHtml}
-                        <div class="receipt-header">St. Georges Church Aley</div>
-                        <div style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 4px;">Station: ${catName}</div>
-                        <hr style="border: dashed 1px #000; margin: 5px 0;">
-                        <div>Receipt ID: ${saleId}</div>
-                        <div>Date: ${saleDate}</div>
-                        <div>Cashier: ${cashier}</div>
-                        <hr style="border: dashed 1px #000; margin: 5px 0;">
-                        <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
-                            <thead>
-                                <tr style="border-bottom: 1px solid #000;">
-                                    <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
-                                    <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
-                                    <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>${itemsHtml}</tbody>
-                        </table>
-                        <hr style="border: dashed 1px #000; margin: 5px 0;">
-                        <div style="text-align: right; font-weight: bold; font-size: 20px;">
-                            Total: $${(catTotalLbp / EXCHANGE_RATE).toFixed(2)}
-                        </div>
-                        <div style="text-align: right; font-weight: bold; font-size: 20px;">
-                            Total LBP: ${catTotalLbp.toLocaleString()} LBP
-                        </div>
-                        <hr style="border: dashed 1px #000; margin: 5px 0;">
-                        <div style="text-align: center; font-weight: bold; font-size: 20px;">Thank You!</div>
-                        <div style="text-align: center; font-weight: bold; font-size: 20px; margin-top: 4px;">Developed by   Alain Koukou</div>
-                        <div style="height: 100px;"></div>
-                        <hr style="border: dashed 1px #000; margin: 5px 0;">
-                        <hr style="border: dashed 1px #000; margin: 5px 0;">
-                    `;
+                    let receiptSection = document.getElementById("receipt-section");
+                    receiptSection.innerHTML = ""; 
 
-                    receiptSection.appendChild(receiptDiv);
+                    let categories = Object.keys(groupedByCategory);
 
-                    // Add page break between different category receipts if there are more following
-                    if (index < categories.length - 1) {
-                        let breakDiv = document.createElement("div");
-                        breakDiv.innerHTML = `<hr style="border: dashed 2px #000; margin: 20px 0;">`;
-                        receiptSection.appendChild(breakDiv);
-                    }
+                    categories.forEach((catName, index) => {
+                        let catItems = groupedByCategory[catName];
+                        let catTotalLbp = catItems.reduce((sum, item) => sum + item.line_total, 0);
+                        
+                        let lookupKey = catName.trim().toLowerCase();
+                        let logoFilename = categoryLogos[lookupKey] || "";
+
+                        let receiptDiv = document.createElement("div");
+                        receiptDiv.className = "thermal-receipt";
+                        
+                        let logoHtml = logoFilename ? `<img src="/static/uploads/${logoFilename}" class="receipt-logo">` : '';
+
+                        let itemsHtml = "";
+                        catItems.forEach(item => {
+                            let itemUsd = item.line_total / EXCHANGE_RATE;
+                            itemsHtml += `
+                                <tr>
+                                    <td style="text-align: left; border: none; padding: 2px 0;">${item.name}</td>
+                                    <td style="text-align: center; border: none; padding: 2px 0;">${item.quantity}</td>
+                                    <td style="text-align: right; border: none; padding: 2px 0;">$${itemUsd.toFixed(2)}</td>
+                                </tr>`;
+                        });
+
+                        receiptDiv.innerHTML = `
+                            ${logoHtml}
+                            <div class="receipt-header">St. Georges Church Aley</div>
+                            <div style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 4px;">Station: ${catName}</div>
+                            <hr style="border: dashed 1px #000; margin: 5px 0;">
+                            <div>Receipt ID: ${saleId}</div>
+                            <div>Date: ${saleDate}</div>
+                            <div>Cashier: ${cashier}</div>
+                            <hr style="border: dashed 1px #000; margin: 5px 0;">
+                            <table style="width: 100%; font-size: inherit; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid #000;">
+                                        <th style="text-align: left; border: none; padding: 2px 0;">Item</th>
+                                        <th style="text-align: center; border: none; padding: 2px 0;">Qty</th>
+                                        <th style="text-align: right; border: none; padding: 2px 0;">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${itemsHtml}</tbody>
+                            </table>
+                            <hr style="border: dashed 1px #000; margin: 5px 0;">
+                            <div style="text-align: right; font-weight: bold; font-size: 20px;">
+                                Total: $${(catTotalLbp / EXCHANGE_RATE).toFixed(2)}
+                            </div>
+                            <div style="text-align: right; font-weight: bold; font-size: 20px;">
+                                Total LBP: ${catTotalLbp.toLocaleString()} LBP
+                            </div>
+                            <hr style="border: dashed 1px #000; margin: 5px 0;">
+                            <div style="text-align: center; font-weight: bold; font-size: 20px;">Thank You!</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 20px; margin-top: 4px;">Developed by Alain Koukou</div>
+                            <div style="height: 100px;"></div>
+                            <hr style="border: dashed 1px #000; margin: 5px 0;">
+                            <hr style="border: dashed 1px #000; margin: 5px 0;">
+                        `;
+
+                        receiptSection.appendChild(receiptDiv);
+
+                        if (index < categories.length - 1) {
+                            let breakDiv = document.createElement("div");
+                            breakDiv.innerHTML = `<hr style="border: dashed 2px #000; margin: 20px 0;">`;
+                            receiptSection.appendChild(breakDiv);
+                        }
+                    });
+
+                    window.print();
+                    alert(data.message);
+                    clearCart();
+                })
+                .catch(error => {
+                    console.error("Checkout error:", error);
+                    alert("Checkout failed");
                 });
-
-                // Trigger print dialog
-                window.print();
-
-                alert(data.message);
-                clearCart();
-            })
-            .catch(error => {
-                console.error("Checkout error:", error);
-                alert("Checkout failed");
             });
         }
     </script>
